@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   // Sign up with Email & Password
-  async function signup(email, password, name, isWorker) {
+  async function signup(email, password, name, isWorker, service = 'ac-repair') {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
@@ -38,20 +38,40 @@ export function AuthProvider({ children }) {
     const role = isWorker ? 'worker' : 'customer';
     
     // Save user role in Firestore
-    await setDoc(doc(db, 'users', user.uid), {
+    const userDataToSave = {
       name: name,
       email: email,
       role: role,
       createdAt: new Date()
-    });
+    };
+
+    if (isWorker) {
+      userDataToSave.service = service;
+      // Default dummy values for a new worker to show up properly
+      userDataToSave.hourlyRate = 250;
+      userDataToSave.rating = 5.0;
+      userDataToSave.reviews = 0;
+      userDataToSave.specialty = 'Professional';
+    }
+
+    await setDoc(doc(db, 'users', user.uid), userDataToSave);
     
     setUserRole(role);
     return userCredential;
   }
 
   // Log in with Email & Password
-  function login(email, password) {
-    return signInWithEmailAndPassword(auth, email, password);
+  async function login(email, password, isWorker = false) {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    
+    // For demo purposes, if they explicitly choose "Worker" during login, update their role to worker
+    if (isWorker) {
+      const userRef = doc(db, 'users', result.user.uid);
+      await setDoc(userRef, { role: 'worker' }, { merge: true });
+      setUserRole('worker');
+    }
+    
+    return result;
   }
 
   // Google Login
@@ -75,7 +95,13 @@ export function AuthProvider({ children }) {
       setUserRole(role);
     } else {
       // If existing user, load their role
-      setUserRole(userDoc.data().role);
+      // For demo purposes, allow upgrading to worker if selected
+      if (isWorker && userDoc.data().role !== 'worker') {
+         await setDoc(doc(db, 'users', user.uid), { role: 'worker' }, { merge: true });
+         setUserRole('worker');
+      } else {
+         setUserRole(userDoc.data().role);
+      }
     }
     
     return result;

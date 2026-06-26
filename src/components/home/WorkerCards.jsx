@@ -1,11 +1,51 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, CheckCircle, Navigation } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { getFirestore, collection, query, where, limit, getDocs } from 'firebase/firestore';
+import app from '../../firebase';
 
 const WorkerCards = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const [topWorkers, setTopWorkers] = useState([]);
+  const db = getFirestore(app);
+
+  useEffect(() => {
+    const fetchTopWorkers = async () => {
+      try {
+        const q = query(collection(db, 'users'), where('role', '==', 'worker'), limit(2));
+        const snapshot = await getDocs(q);
+        const workers = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || 'Unknown',
+            skill: data.specialty || 'General Service',
+            exp: data.experience || '1 yr',
+            rating: data.rating || '5.0',
+            reviews: data.reviews || '0',
+            price: `₹${data.hourlyRate || 250}/hr`,
+            response: `${data.responseTimeMinutes || 15} min`,
+            initials: data.name ? data.name.substring(0, 2).toUpperCase() : 'W'
+          };
+        });
+        
+        // If database is empty, provide fallback
+        if (workers.length === 0) {
+          setTopWorkers([
+            { initials: 'RK', name: 'Ramesh Kumar', skill: t('cat_ac'), exp: '7 yrs', rating: '4.9', reviews: '142', price: '₹299/hr', response: '12 min' },
+            { initials: 'SP', name: 'Suresh Plumber', skill: t('cat_plumbing'), exp: '11 yrs', rating: '4.8', reviews: '89', price: '₹249/hr', response: '8 min' }
+          ]);
+        } else {
+          setTopWorkers(workers);
+        }
+      } catch (err) {
+        console.error("Error fetching workers:", err);
+      }
+    };
+    fetchTopWorkers();
+  }, [db, t]);
 
   return (
     <section className="max-w-6xl mx-auto px-4 py-12">
@@ -13,10 +53,7 @@ const WorkerCards = () => {
       <h3 className="font-syne text-3xl font-bold text-gray-900 dark:text-white mb-8">{t('workers_title')}</h3>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {[
-          { initials: 'RK', name: 'Ramesh Kumar', skill: t('cat_ac'), exp: '7 yrs', rating: '4.9', reviews: '142', price: '₹299/hr', response: '12 min' },
-          { initials: 'SP', name: 'Suresh Plumber', skill: t('cat_plumbing'), exp: '11 yrs', rating: '4.8', reviews: '89', price: '₹249/hr', response: '8 min' }
-        ].map((worker, i) => (
+        {topWorkers.map((worker, i) => (
           <div key={i} className="glass-card rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#06B6D4] flex items-center justify-center text-lg font-bold text-white shadow-lg">
@@ -47,7 +84,7 @@ const WorkerCards = () => {
                    <Navigation className="w-3 h-3" /> Responds in ~{worker.response}
                  </div>
               </div>
-              <button onClick={() => navigate('/worker')} className="px-6 py-2 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm font-medium hover:bg-[#3B82F6] hover:text-white dark:hover:bg-[#3B82F6] dark:hover:border-[#3B82F6] transition-all shadow-sm dark:shadow-none w-full sm:w-auto">
+              <button onClick={() => navigate(worker.id ? `/worker/${worker.id}` : '/worker')} className="px-6 py-2 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm font-medium hover:bg-[#3B82F6] hover:text-white dark:hover:bg-[#3B82F6] dark:hover:border-[#3B82F6] transition-all shadow-sm dark:shadow-none w-full sm:w-auto">
                 {t('workers_book_btn')}
               </button>
             </div>

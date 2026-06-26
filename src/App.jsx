@@ -57,11 +57,13 @@ function App() {
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/listing" element={<ServiceListing />} />
                 <Route path="/worker" element={<WorkerProfile />} />
+                <Route path="/worker/:id" element={<WorkerProfile />} />
                 <Route path="/dashboard" element={<UserDashboard />} />
                 <Route path="/worker-dashboard" element={<WorkerDashboard />} />
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/review" element={<ReviewForm />} />
                 <Route path="/booking" element={<BookingFlow />} />
+                <Route path="/booking/:id" element={<BookingFlow />} />
               </Routes>
               <FloatingNav />
             </Router>

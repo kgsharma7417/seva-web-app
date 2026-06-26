@@ -13,7 +13,15 @@ const EditProfileModal = ({ isOpen, onClose }) => {
     phone: '',
     city: '',
     area: '',
-    avatar: ''
+    avatar: '',
+    // Worker fields
+    service: 'ac-repair',
+    specialty: '',
+    hourlyRate: 250,
+    experience: '',
+    bio: '',
+    skills: '',
+    languages: ''
   });
 
   useEffect(() => {
@@ -23,7 +31,14 @@ const EditProfileModal = ({ isOpen, onClose }) => {
         phone: userData.phone || '',
         city: userData.city || '',
         area: userData.area || '',
-        avatar: userData.avatar || ''
+        avatar: userData.avatar || '',
+        service: userData.service || 'ac-repair',
+        specialty: userData.specialty || '',
+        hourlyRate: userData.hourlyRate || 250,
+        experience: userData.experience || '',
+        bio: userData.bio || '',
+        skills: userData.skills ? userData.skills.join(', ') : '',
+        languages: userData.languages ? userData.languages.join(', ') : ''
       });
     }
   }, [userData]);
@@ -49,7 +64,12 @@ const EditProfileModal = ({ isOpen, onClose }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await updateUserProfile(formData);
+      const payload = { ...formData };
+      if (userData?.role === 'worker') {
+        payload.skills = formData.skills.split(',').map(s => s.trim()).filter(s => s);
+        payload.languages = formData.languages.split(',').map(s => s.trim()).filter(s => s);
+      }
+      await updateUserProfile(payload);
       onClose();
     } catch (error) {
       console.error("Failed to update profile", error);
@@ -140,6 +160,101 @@ const EditProfileModal = ({ isOpen, onClose }) => {
             >
               Update Location via Map
             </button>
+
+            {userData?.role === 'worker' && (
+              <div className="pt-4 border-t border-gray-200 dark:border-white/10 space-y-4">
+                <h3 className="font-syne font-bold text-gray-900 dark:text-white">Worker Details</h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Service Category</label>
+                    <select 
+                      name="service"
+                      value={formData.service}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-[#3B82F6] text-gray-900 dark:text-white transition-colors appearance-none"
+                    >
+                      <option value="ac-repair">AC Repair</option>
+                      <option value="plumbing">Plumbing</option>
+                      <option value="electrical">Electrical</option>
+                      <option value="cleaning">Cleaning</option>
+                      <option value="carpentry">Carpentry</option>
+                      <option value="painting">Painting</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Specialty (e.g., AC Tech)</label>
+                    <input 
+                      type="text" 
+                      name="specialty"
+                      value={formData.specialty}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-[#3B82F6] text-gray-900 dark:text-white transition-colors"
+                      placeholder="e.g. Master Plumber"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Hourly Rate (₹)</label>
+                    <input 
+                      type="number" 
+                      name="hourlyRate"
+                      value={formData.hourlyRate}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-[#3B82F6] text-gray-900 dark:text-white transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Experience (e.g. 5 yrs)</label>
+                    <input 
+                      type="text" 
+                      name="experience"
+                      value={formData.experience}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-[#3B82F6] text-gray-900 dark:text-white transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Bio / Description</label>
+                  <textarea 
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-[#3B82F6] text-gray-900 dark:text-white transition-colors min-h-[80px]"
+                    placeholder="Tell customers about your expertise..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Skills (comma separated)</label>
+                    <input 
+                      type="text" 
+                      name="skills"
+                      value={formData.skills}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-[#3B82F6] text-gray-900 dark:text-white transition-colors"
+                      placeholder="e.g. PCB Repair, Gas Refill"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Languages (comma separated)</label>
+                    <input 
+                      type="text" 
+                      name="languages"
+                      value={formData.languages}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-[#3B82F6] text-gray-900 dark:text-white transition-colors"
+                      placeholder="e.g. Hindi, English"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="pt-4 flex gap-3">

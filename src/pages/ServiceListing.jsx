@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Star, MapPin, Clock, Heart, MessageCircle, Search, Filter, Zap, Wrench, Droplets, Sparkles, ChevronLeft, Navigation } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useLocation } from '../context/LocationContext';
+import { getFirestore, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import app from '../firebase';
 
 // Helper function to calculate distance using Haversine formula
 function getDistanceInKm(lat1, lon1, lat2, lon2) {
@@ -17,15 +19,7 @@ function getDistanceInKm(lat1, lon1, lat2, lon2) {
   return R * c; 
 }
 
-const mockWorkers = [
-  { id: '1', name: 'Ramesh Kumar', service: 'ac-repair', specialty: 'AC Technician', rating: 4.9, reviews: 142, experience: '7 yrs', hourlyRate: 299, responseTime: '~12 min', responseTimeMinutes: 12, verified: true, image: 'RK', area: 'Agra City', coordinates: { lat: 27.1767, lng: 78.0081 } },
-  { id: '2', name: 'Suresh Plumber', service: 'plumbing', specialty: 'Plumber', rating: 4.8, reviews: 89, experience: '11 yrs', hourlyRate: 249, responseTime: '~8 min', responseTimeMinutes: 8, verified: true, image: 'SP', area: 'Taj Ganj', coordinates: { lat: 27.1691, lng: 78.0421 } },
-  { id: '3', name: 'Arjun Electrician', service: 'electrical', specialty: 'Electrician', rating: 4.7, reviews: 156, experience: '9 yrs', hourlyRate: 279, responseTime: '~15 min', responseTimeMinutes: 15, verified: true, image: 'AE', area: 'Sadar Bazar', coordinates: { lat: 27.1561, lng: 78.0175 } },
-  { id: '4', name: 'Priya Cleaning', service: 'cleaning', specialty: 'House Cleaning', rating: 4.6, reviews: 203, experience: '5 yrs', hourlyRate: 199, responseTime: '~10 min', responseTimeMinutes: 10, verified: true, image: 'PC', area: 'Fatehpur Sikri Road', coordinates: { lat: 27.0921, lng: 77.6713 } },
-  { id: '5', name: 'Vikram Carpenter', service: 'carpentry', specialty: 'Carpenter', rating: 4.8, reviews: 78, experience: '13 yrs', hourlyRate: 329, responseTime: '~20 min', responseTimeMinutes: 20, verified: true, image: 'VC', area: 'Civil Lines', coordinates: { lat: 27.1950, lng: 78.0200 } },
-  { id: '6', name: 'Deepak Painter', service: 'painting', specialty: 'Painter', rating: 4.5, reviews: 112, experience: '8 yrs', hourlyRate: 259, responseTime: '~18 min', responseTimeMinutes: 18, verified: true, image: 'DP', area: 'Shilpgram', coordinates: { lat: 27.1650, lng: 78.0550 } },
-];
-
+// mockWorkers removed in favor of real Firebase data
 const AREAS = ['All Areas', 'Agra City', 'Taj Ganj', 'Sadar Bazar', 'Civil Lines', 'Fatehpur Sikri Road', 'Shilpgram'];
 const PRICE_RANGES = [
   { label: 'Under ₹250', min: 0, max: 250 },
@@ -41,22 +35,70 @@ export default function ServiceListing() {
   const [selectedService, setSelectedService] = useState('');
   const [selectedArea, setSelectedArea] = useState('All Areas');
   const [priceRange, setPriceRange] = useState({ min: 0, max: 9999 });
+  const [selectedSkills, setSelectedSkills] = useState([]);
   const [sortBy, setSortBy] = useState('distance');
   const [favorites, setFavorites] = useState(new Set());
+  const [workers, setWorkers] = useState([]);
+  const db = getFirestore(app);
+
+  React.useEffect(() => {
+    const q = query(collection(db, 'users'), where('role', '==', 'worker'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedWorkers = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || 'Unknown Worker',
+          service: data.service || 'ac-repair',
+          specialty: data.specialty || 'General Service',
+          rating: data.rating || 5.0,
+          reviews: data.reviews || 0,
+          experience: data.experience || '1 yr',
+          hourlyRate: data.hourlyRate || 250,
+          responseTime: `~${data.responseTimeMinutes || 15} min`,
+          responseTimeMinutes: data.responseTimeMinutes || 15,
+          verified: data.verified !== false,
+          image: data.name ? data.name.substring(0, 2).toUpperCase() : 'W',
+          area: data.area || 'Agra City',
+          coordinates: data.coordinates || { lat: 27.1767, lng: 78.0081 },
+          ...data
+        };
+      });
+      setWorkers(fetchedWorkers);
+    });
+    return () => unsubscribe();
+  }, [db]);
 
   const SERVICES = [
-    { id: 'ac-repair', name: t('cat_ac'), icon: Zap, count: 320 },
-    { id: 'plumbing', name: t('cat_plumbing'), icon: Droplets, count: 210 },
-    { id: 'electrical', name: t('cat_electrical'), icon: Wrench, count: 180 },
-    { id: 'cleaning', name: t('cat_cleaning'), icon: Sparkles, count: 95 },
-    { id: 'carpentry', name: t('cat_carpentry'), icon: Wrench, count: 67 },
-    { id: 'painting', name: t('cat_painting'), icon: Sparkles, count: 143 },
+    { id: 'ac-repair', name: t('cat_ac'), icon: Zap, count: workers.filter(w => w.service === 'ac-repair').length },
+    { id: 'plumbing', name: t('cat_plumbing'), icon: Droplets, count: workers.filter(w => w.service === 'plumbing').length },
+    { id: 'electrical', name: t('cat_electrical'), icon: Wrench, count: workers.filter(w => w.service === 'electrical').length },
+    { id: 'cleaning', name: t('cat_cleaning'), icon: Sparkles, count: workers.filter(w => w.service === 'cleaning').length },
+    { id: 'carpentry', name: t('cat_carpentry'), icon: Wrench, count: workers.filter(w => w.service === 'carpentry').length },
+    { id: 'painting', name: t('cat_painting'), icon: Sparkles, count: workers.filter(w => w.service === 'painting').length },
   ];
 
+  // Extract all unique skills from available workers
+  const availableSkills = useMemo(() => {
+    const skillsSet = new Set();
+    workers.forEach(w => {
+      if (w.skills && Array.isArray(w.skills)) {
+        w.skills.forEach(s => skillsSet.add(s));
+      }
+    });
+    return Array.from(skillsSet).sort();
+  }, [workers]);
+
+  const toggleSkill = (skill) => {
+    setSelectedSkills(prev => 
+      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
+    );
+  };
+
   const filteredWorkers = useMemo(() => {
-    let filtered = mockWorkers.map(w => {
+    let filtered = workers.map(w => {
       // Calculate distance to this worker
-      const userCoords = userLocation.coordinates;
+      const userCoords = userLocation?.coordinates;
       let dist = 0;
       if (userCoords && w.coordinates) {
         dist = getDistanceInKm(userCoords.lat, userCoords.lng, w.coordinates.lat, w.coordinates.lng);
@@ -67,6 +109,14 @@ export default function ServiceListing() {
     if (selectedService) filtered = filtered.filter(w => w.service === selectedService);
     if (selectedArea !== 'All Areas') filtered = filtered.filter(w => w.area === selectedArea);
     filtered = filtered.filter(w => w.hourlyRate >= priceRange.min && w.hourlyRate <= priceRange.max);
+    
+    // Filter by selected skills (OR logic: worker must have at least one selected skill)
+    if (selectedSkills.length > 0) {
+      filtered = filtered.filter(w => {
+        if (!w.skills || !Array.isArray(w.skills)) return false;
+        return selectedSkills.some(skill => w.skills.includes(skill));
+      });
+    }
 
     if (sortBy === 'distance') filtered.sort((a, b) => a.distanceKm - b.distanceKm);
     else if (sortBy === 'rating') filtered.sort((a, b) => b.rating - a.rating);
@@ -74,7 +124,7 @@ export default function ServiceListing() {
     else if (sortBy === 'price') filtered.sort((a, b) => a.hourlyRate - b.hourlyRate);
 
     return filtered;
-  }, [selectedService, selectedArea, priceRange, sortBy, userLocation]);
+  }, [selectedService, selectedArea, priceRange, selectedSkills, sortBy, userLocation, workers]);
 
   const toggleFavorite = (workerId) => {
     const newFavorites = new Set(favorites);
@@ -194,6 +244,31 @@ export default function ServiceListing() {
                   })}
                 </div>
               </div>
+
+              {/* Skills Filter */}
+              {availableSkills.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">Specific Skills</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {availableSkills.map(skill => {
+                      const isSelected = selectedSkills.includes(skill);
+                      return (
+                        <button
+                          key={skill}
+                          onClick={() => toggleSkill(skill)}
+                          className={`px-3 py-1.5 rounded-lg border transition-all text-xs font-medium ${
+                            isSelected
+                              ? 'bg-[#3B82F6] border-[#3B82F6] text-white shadow-md shadow-[#3B82F6]/20'
+                              : 'glass-card border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                          }`}
+                        >
+                          {skill}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Sort By */}
               <div>
@@ -315,7 +390,7 @@ export default function ServiceListing() {
                       <MessageCircle className="w-4 h-4 text-[#3B82F6]" />
                       Message
                     </button>
-                    <button onClick={() => navigate('/worker')} className="flex-1 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white py-3 rounded-xl font-bold hover:scale-[1.02] transition-transform shadow-lg shadow-[#3B82F6]/20">
+                    <button onClick={() => navigate(`/worker/${worker.id}`)} className="flex-1 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white py-3 rounded-xl font-bold hover:scale-[1.02] transition-transform shadow-lg shadow-[#3B82F6]/20">
                       {t('workers_book_btn')}
                     </button>
                   </div>

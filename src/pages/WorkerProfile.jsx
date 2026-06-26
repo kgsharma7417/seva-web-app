@@ -1,18 +1,25 @@
-import React, { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import ProfileHeader from '../components/profile/ProfileHeader';
 import AboutSection from '../components/profile/AboutSection';
 import ReviewsList from '../components/profile/ReviewsList';
 import BookingPanel from '../components/profile/BookingPanel';
 import { useLanguage } from '../context/LanguageContext';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import app from '../firebase';
 
 const WorkerProfile = () => {
+  const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const db = getFirestore(app);
   
-  // Memoize static mock data to prevent unnecessary re-creations on re-renders
-  const workerData = useMemo(() => ({
+  const [workerData, setWorkerData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fallbackData = {
+    id: 'dummy_worker_id',
     initials: 'RK',
     name: 'Ramesh Kumar',
     skill: t('cat_ac') + ' Expert',
@@ -44,15 +51,51 @@ const WorkerProfile = () => {
         date: '1 week ago',
         rating: 5,
         text: 'Very clean work. He made sure not to mess up the room while servicing. The AC is working like new now.'
-      },
-      {
-        author: 'Anjali Desai',
-        date: '2 weeks ago',
-        rating: 4,
-        text: 'Good service, came exactly on time. Price was reasonable.'
       }
     ]
-  }), [t]);
+  };
+
+  useEffect(() => {
+    const fetchWorker = async () => {
+      try {
+        if (!id) throw new Error("No ID");
+        const docRef = doc(db, 'users', id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().role === 'worker') {
+          const data = docSnap.data();
+          setWorkerData({
+            id: docSnap.id,
+            initials: data.name ? data.name.substring(0, 2).toUpperCase() : 'W',
+            name: data.name || 'Unknown',
+            skill: data.specialty || 'Service Expert',
+            experience: data.experience || '1 Year',
+            rating: data.rating || 5.0,
+            reviews: data.reviews || 0,
+            location: data.area || 'Unknown Location',
+            jobsCompleted: '0+',
+            price: `₹${data.hourlyRate || 250}`,
+            responseTime: `${data.responseTimeMinutes || 15} min`,
+            bio: data.bio || 'Professional service provider.',
+            skills: ['General Service'],
+            languages: ['Hindi', 'English'],
+            reviewsList: []
+          });
+        }
+      } catch (err) {
+        console.error("Worker not found or error fetching", err);
+      }
+      setLoading(false);
+    };
+    fetchWorker();
+  }, [id, db, t]);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#060D1F] text-white">Loading...</div>;
+  }
+
+  // Use fallback data if no ID was provided or fetch failed
+  const activeWorkerData = workerData || fallbackData;
+
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#060D1F] text-gray-900 dark:text-white font-inter overflow-x-hidden pb-20 transition-colors duration-300">
@@ -81,14 +124,14 @@ const WorkerProfile = () => {
           
           {/* Left Column (Profile Details) */}
           <div className="lg:col-span-2 space-y-8">
-            <ProfileHeader worker={workerData} />
-            <AboutSection bio={workerData.bio} skills={workerData.skills} languages={workerData.languages} />
-            <ReviewsList reviews={workerData.reviewsList} />
+            <ProfileHeader worker={activeWorkerData} />
+            <AboutSection bio={activeWorkerData.bio} skills={activeWorkerData.skills} languages={activeWorkerData.languages} />
+            <ReviewsList reviews={activeWorkerData.reviewsList} />
           </div>
 
           {/* Right Column (Sticky Booking Widget) */}
           <div className="lg:col-span-1">
-            <BookingPanel price={workerData.price} responseTime={workerData.responseTime} />
+            <BookingPanel workerId={activeWorkerData.id} price={activeWorkerData.price} responseTime={activeWorkerData.responseTime} />
           </div>
           
         </div>

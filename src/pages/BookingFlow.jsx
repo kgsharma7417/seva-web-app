@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, CreditCard, Camera, CheckCircle2, Shield, Info, Smartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import app from '../firebase';
 
 export default function BookingFlow() {
+  const { id } = useParams();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, userData } = useAuth();
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -17,15 +18,44 @@ export default function BookingFlow() {
   const [paymentMethod, setPaymentMethod] = useState('upi');
   const [bookingId, setBookingId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [worker, setWorker] = useState(null);
+  const [loading, setLoading] = useState(true);
   const db = getFirestore(app);
 
-  const worker = {
+  const fallbackWorker = {
+    id: 'dummy_worker_id',
     name: 'Ramesh Kumar',
     service: t('cat_ac'),
     rating: 4.9,
     price: 299,
     avatar: 'RK'
   };
+
+  useEffect(() => {
+    const fetchWorker = async () => {
+      try {
+        if (!id) throw new Error("No worker ID");
+        const docRef = doc(db, 'users', id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setWorker({
+            id: docSnap.id,
+            name: data.name || 'Worker',
+            service: data.specialty || t('cat_ac'),
+            rating: data.rating || 5.0,
+            price: data.hourlyRate || 299,
+            avatar: data.name ? data.name.substring(0, 2).toUpperCase() : 'W'
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch worker", err);
+      }
+      setLoading(false);
+    };
+    fetchWorker();
+  }, [id, db, t]);
 
   const nextStep = async () => {
     if (step < 3) {
@@ -39,19 +69,19 @@ export default function BookingFlow() {
 
       setIsSubmitting(true);
       try {
+        const activeWorker = worker || fallbackWorker;
         const bookingData = {
           customerId: currentUser.uid,
           customerName: currentUser.displayName || 'Customer',
-          // Dummy worker for testing worker dashboard
-          workerId: 'dummy_worker_id', 
-          workerName: worker.name,
-          service: worker.service,
+          workerId: activeWorker.id, 
+          workerName: activeWorker.name,
+          service: activeWorker.service,
           status: 'pending',
           date: selectedDate,
           time: selectedTime,
           address: 'Flat 402, Taj Residency, Fatehabad Road, Agra',
-          price: worker.price,
-          totalAmount: worker.price + 45,
+          price: (worker || fallbackWorker).price,
+          totalAmount: (worker || fallbackWorker).price + 45,
           paymentMethod: paymentMethod,
           createdAt: serverTimestamp()
         };
@@ -72,6 +102,12 @@ export default function BookingFlow() {
     if (step > 1) setStep(step - 1);
   };
 
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#060D1F] text-white">Loading...</div>;
+  }
+
+  const activeWorker = worker || fallbackWorker;
+
   if (isSuccess) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#060D1F] text-gray-900 dark:text-white font-inter flex flex-col items-center justify-center p-6 transition-colors duration-300">
@@ -85,7 +121,7 @@ export default function BookingFlow() {
           <div className="bg-gray-100 dark:bg-white/5 rounded-2xl p-4 text-left mb-6 space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-500 text-sm">Worker</span>
-              <span className="text-gray-900 dark:text-white text-sm font-bold">{worker.name}</span>
+              <span className="text-gray-900 dark:text-white text-sm font-bold">{activeWorker.name}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 text-sm">Schedule</span>
@@ -300,11 +336,11 @@ export default function BookingFlow() {
               
               <div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-white/5 mb-4">
                 <div className="w-12 h-12 bg-gray-100 dark:bg-white/10 rounded-xl flex items-center justify-center font-bold text-gray-600 dark:text-gray-300">
-                  {worker.avatar}
+                  {activeWorker.avatar}
                 </div>
                 <div>
-                  <h4 className="text-gray-900 dark:text-white font-bold">{worker.name}</h4>
-                  <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">{worker.service}</p>
+                  <h4 className="text-gray-900 dark:text-white font-bold">{activeWorker.name}</h4>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">{activeWorker.service}</p>
                 </div>
               </div>
 
@@ -324,7 +360,7 @@ export default function BookingFlow() {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500 dark:text-gray-400">Service Fee</span>
-                  <span className="text-gray-900 dark:text-white">₹{worker.price}</span>
+                  <span className="text-gray-900 dark:text-white">₹{activeWorker.price}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500 dark:text-gray-400">Taxes & Fees <Info className="inline w-3 h-3 text-gray-400 dark:text-gray-500 ml-1"/></span>
@@ -332,7 +368,7 @@ export default function BookingFlow() {
                 </div>
                 <div className="border-t border-gray-200 dark:border-white/5 pt-3 flex justify-between">
                   <span className="text-gray-900 dark:text-white font-bold">Total Amount</span>
-                  <span className="text-2xl font-syne font-bold text-[#3B82F6]">₹{worker.price + 45}</span>
+                  <span className="text-2xl font-syne font-bold text-[#3B82F6]">₹{activeWorker.price + 45}</span>
                 </div>
               </div>
 

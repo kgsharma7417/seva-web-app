@@ -6,15 +6,18 @@ import { useAuth } from '../context/AuthContext';
 import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import app from '../firebase';
 import MapSelector from '../components/common/MapSelector';
+import EditProfileModal from '../components/profile/EditProfileModal';
 
 export default function WorkerDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [showNotifications, setShowNotifications] = useState(false);
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, userData, updateUserProfile } = useAuth();
   const db = getFirestore(app);
   const [allBookings, setAllBookings] = useState([]);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isIDModalOpen, setIsIDModalOpen] = useState(false);
 
   useEffect(() => {
     if (!currentUser) {
@@ -52,20 +55,29 @@ export default function WorkerDashboard() {
     }
   };
 
-  // Mock Data
+  // Derived Data for Worker Profile
   const workerProfile = {
-    name: "Ramesh Kumar",
-    skill: t('cat_ac') + " Technician",
-    rating: 4.9,
-    avatar: "RK",
-    completeness: 85,
+    name: userData?.name || "New Worker",
+    skill: userData?.specialty || "Setup your profile",
+    rating: userData?.rating || 5.0,
+    avatar: userData?.avatar || (userData?.name ? userData.name.substring(0, 2).toUpperCase() : "W"),
+    completeness: userData?.hourlyRate ? 100 : 40,
     responseRate: "98%",
-    avgResponseTime: "5 mins",
-    location: { name: "Agra City", coordinates: { lat: 27.1767, lng: 78.0081 } }
+    location: userData?.area || "Agra City"
   };
 
-  const [workerLocation, setWorkerLocation] = useState(workerProfile.location);
+  const workerLocation = userData?.coordinates || { lat: 27.1767, lng: 78.0081 };
   const [isMapOpen, setIsMapOpen] = useState(false);
+
+  const handleUpdateLocation = async (loc) => {
+    try {
+      await updateUserProfile({ coordinates: loc.coordinates, area: loc.name });
+    } catch (err) {
+      console.error("Failed to save location", err);
+    } finally {
+      setIsMapOpen(false);
+    }
+  };
 
   const completedJobs = allBookings.filter(b => b.status === 'completed');
   const totalEarnings = completedJobs.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
@@ -381,6 +393,7 @@ export default function WorkerDashboard() {
                   </div>
                   <button 
                     disabled={earnings.walletBalance < 500}
+                    onClick={() => alert(`Payout of ₹${earnings.walletBalance} requested successfully! Money will be credited in 24-48 hours.`)}
                     className="px-6 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-[#060D1F] rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-bold text-sm shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     Request Payout
@@ -418,7 +431,15 @@ export default function WorkerDashboard() {
           {/* PROFILE / PERFORMANCE TAB */}
           {activeTab === 'profile' && (
             <div className="space-y-8 animate-fade-up">
-              <h3 className="font-syne font-bold text-xl text-gray-900 dark:text-white mb-6">Performance & Profile</h3>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-syne font-bold text-xl text-gray-900 dark:text-white">Performance & Profile</h3>
+                <button 
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="px-4 py-2 bg-[#3B82F6]/10 text-[#3B82F6] font-bold rounded-xl hover:bg-[#3B82F6]/20 transition-colors"
+                >
+                  Edit Profile
+                </button>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Metrics */}
@@ -453,9 +474,24 @@ export default function WorkerDashboard() {
                           {item.done && <Check className="w-3.5 h-3.5" />}
                         </div>
                         <span className={`text-sm ${item.done ? 'text-gray-500 dark:text-gray-300' : 'text-gray-900 dark:text-white font-medium'}`}>{item.label}</span>
-                        {!item.done && <button className="ml-auto text-xs text-[#3B82F6] hover:text-[#2563EB] dark:hover:text-white font-bold">Upload</button>}
                       </div>
                     ))}
+                    {/* ID Proof Entry */}
+                    <div className="flex items-center gap-4">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${userData?.idProof ? 'bg-[#10B981] text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-gray-600'}`}>
+                        {userData?.idProof && <Check className="w-3.5 h-3.5" />}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-white text-sm">ID Proof</p>
+                        <p className="text-xs text-gray-500">{userData?.idProof ? 'Verified' : 'Pending Verification'}</p>
+                      </div>
+                      <button 
+                        onClick={() => setIsIDModalOpen(true)} 
+                        className="ml-auto text-xs text-[#3B82F6] hover:text-[#2563EB] dark:hover:text-white font-bold"
+                      >
+                        {userData?.idProof ? 'View' : 'Upload'}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -469,20 +505,15 @@ export default function WorkerDashboard() {
                       </h4>
                       <p className="text-sm text-gray-500 mt-1">Set your operating base so customers can find you</p>
                     </div>
-                    <button 
-                      onClick={() => setIsMapOpen(true)}
-                      className="px-4 py-2 bg-[#3B82F6]/10 text-[#3B82F6] font-bold rounded-xl hover:bg-[#3B82F6]/20 transition-colors"
-                    >
-                      Update Location
-                    </button>
+                    <button onClick={() => setIsMapOpen(true)} className="text-sm font-bold text-[#3B82F6]">Change</button>
                   </div>
                   <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-4 border border-gray-100 dark:border-white/10 flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl bg-white dark:bg-[#060D1F] flex items-center justify-center flex-shrink-0">
                       <MapPin className="w-6 h-6 text-[#06B6D4]" />
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">{workerLocation.name}</p>
-                      <p className="text-xs text-gray-500">Lat: {workerLocation.coordinates.lat.toFixed(4)}, Lng: {workerLocation.coordinates.lng.toFixed(4)}</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">{workerProfile.location}</p>
+                      <p className="text-xs text-gray-500">Lat: {workerLocation.lat.toFixed(4)}, Lng: {workerLocation.lng.toFixed(4)}</p>
                     </div>
                   </div>
                 </div>
@@ -506,9 +537,31 @@ export default function WorkerDashboard() {
       <MapSelector 
         isOpen={isMapOpen} 
         onClose={() => setIsMapOpen(false)} 
-        onSelect={(loc) => { setWorkerLocation(loc); setIsMapOpen(false); }}
-        initialPosition={workerLocation.coordinates}
+        onSelect={(loc) => { handleUpdateLocation(loc); setIsMapOpen(false); }}
+        initialPosition={workerLocation}
       />
+      <EditProfileModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} />
+      
+      {/* ID Modal */}
+      {isIDModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+          <div className="bg-white dark:bg-[#0A132D] p-6 rounded-2xl max-w-sm w-full relative">
+            <button onClick={() => setIsIDModalOpen(false)} className="absolute top-4 right-4 text-gray-500">X</button>
+            <h3 className="font-syne font-bold text-xl mb-4 text-gray-900 dark:text-white">Upload ID Proof</h3>
+            <p className="text-gray-500 mb-6">Please upload your Aadhar Card or Driver's License.</p>
+            <button 
+              onClick={() => {
+                updateUserProfile({ idProof: true });
+                setIsIDModalOpen(false);
+                alert("ID uploaded successfully!");
+              }}
+              className="w-full bg-[#10B981] text-white py-3 rounded-xl font-bold"
+            >
+              Simulate Upload
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

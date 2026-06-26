@@ -13,10 +13,10 @@ const Categories = () => {
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         {[
-          { title: t('cat_ac'), icon: '❄️', workers: '320' },
-          { title: t('cat_electrical'), icon: '⚡', workers: '180' },
-          { title: t('cat_plumbing'), icon: '🔧', workers: '210' },
-          { title: t('cat_cleaning'), icon: '🧹', workers: '95' },
+          { title: t('cat_ac'), icon: '❄️', workers: 'Available' },
+          { title: t('cat_electrical'), icon: '⚡', workers: 'Available' },
+          { title: t('cat_plumbing'), icon: '🔧', workers: 'Available' },
+          { title: t('cat_cleaning'), icon: '🧹', workers: 'Available' },
         ].map((category, i) => (
           <div 
             key={i} 

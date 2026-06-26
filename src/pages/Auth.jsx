@@ -10,6 +10,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [isWorker, setIsWorker] = useState(false);
+  const [workerService, setWorkerService] = useState('ac-repair');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -34,10 +35,10 @@ export default function AuthPage() {
 
     try {
       if (isLogin) {
-        await login(email, password);
+        await login(email, password, isWorker);
         // Navigation will be handled by useEffect
       } else {
-        await signup(email, password, name, isWorker);
+        await signup(email, password, name, isWorker, workerService);
         // Navigation will be handled by useEffect
       }
     } catch (err) {
@@ -126,6 +127,26 @@ export default function AuthPage() {
                     className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all"
                     placeholder="John Doe"
                   />
+                </div>
+              </div>
+            )}
+
+            {!isLogin && isWorker && (
+              <div>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Your Service Area</label>
+                <div className="relative">
+                  <select
+                    value={workerService}
+                    onChange={(e) => setWorkerService(e.target.value)}
+                    className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-3 px-4 text-gray-900 dark:text-white focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all appearance-none"
+                  >
+                    <option value="ac-repair">AC Repair</option>
+                    <option value="plumbing">Plumbing</option>
+                    <option value="electrical">Electrical</option>
+                    <option value="cleaning">Cleaning</option>
+                    <option value="carpentry">Carpentry</option>
+                    <option value="painting">Painting</option>
+                  </select>
                 </div>
               </div>
             )}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Clock, Zap } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 
-const BookingPanel = ({ price, responseTime }) => {
+const BookingPanel = ({ workerId, price, responseTime }) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
 
@@ -27,7 +27,7 @@ const BookingPanel = ({ price, responseTime }) => {
         </div>
       </div>
       
-      <button onClick={() => navigate('/booking')} className="w-full bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white font-medium rounded-xl py-4 hover:scale-[1.02] transition-transform shadow-lg shadow-[#3B82F6]/25 flex items-center justify-center gap-2 mb-4">
+      <button onClick={() => navigate(`/booking/${workerId}`)} className="w-full bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white font-medium rounded-xl py-4 hover:scale-[1.02] transition-transform shadow-lg shadow-[#3B82F6]/25 flex items-center justify-center gap-2 mb-4">
         {t('workers_book_btn')} <Zap className="w-4 h-4 fill-white" />
       </button>
       

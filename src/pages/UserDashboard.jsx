@@ -18,71 +18,7 @@ import app from '../firebase';
 
 // Removed static mockUserProfile as we now use real data from AuthContext
 
-const mockBookings = [
-  {
-    id: 'B001',
-    workerId: '1',
-    workerName: 'Ramesh Kumar',
-    service: 'AC Repair',
-    serviceIcon: '❄️',
-    status: 'active',
-    scheduledAt: '15 Mar 2024, 10:00 AM',
-    amount: 599,
-    workerImage: 'RK',
-    location: 'Taj Ganj, Agra',
-    duration: '1-2 hours',
-  },
-  {
-    id: 'B002',
-    workerId: '2',
-    workerName: 'Suresh Plumber',
-    service: 'Plumbing',
-    serviceIcon: '🔧',
-    status: 'completed',
-    scheduledAt: '10 Mar 2024, 2:30 PM',
-    completedAt: '10 Mar 2024, 3:45 PM',
-    amount: 499,
-    rating: 4.5,
-    reviewed: true,
-    workerImage: 'SP',
-    location: 'Sadar Bazar, Agra',
-    duration: '1.5 hours',
-    notes: 'Fixed water leakage in bathroom. Very professional work.',
-  },
-  {
-    id: 'B003',
-    workerId: '3',
-    workerName: 'Arjun Electrician',
-    service: 'Electrical',
-    serviceIcon: '⚡',
-    status: 'completed',
-    scheduledAt: '5 Mar 2024, 11:00 AM',
-    completedAt: '5 Mar 2024, 12:15 PM',
-    amount: 559,
-    rating: 5,
-    reviewed: true,
-    workerImage: 'AE',
-    location: 'Civil Lines, Agra',
-    duration: '1.5 hours',
-    notes: 'Installed new switch boards. Quick and reliable.',
-  },
-  {
-    id: 'B004',
-    workerId: '4',
-    workerName: 'Priya Cleaning',
-    service: 'House Cleaning',
-    serviceIcon: '🧹',
-    status: 'completed',
-    scheduledAt: '28 Feb 2024, 9:00 AM',
-    completedAt: '28 Feb 2024, 11:30 AM',
-    amount: 399,
-    rating: 4,
-    reviewed: false,
-    workerImage: 'PC',
-    location: 'Shilpgram, Agra',
-    duration: '2.5 hours',
-  },
-];
+
 
 const mockTransactions = [
   { id: 'T001', type: 'debit', title: 'AC Repair - Ramesh Kumar', description: 'Active booking', amount: 599, date: '15 Mar 2024', bookingId: 'B001' },
@@ -394,7 +330,7 @@ export default function UserDashboard() {
     <div className="space-y-8 animate-fade-up">
       <div className="flex gap-2 border-b border-gray-200 dark:border-white/5 overflow-x-auto no-scrollbar pb-2">
         {[
-          { label: 'All Bookings', count: mockBookings.length },
+          { label: 'All Bookings', count: myBookings.length },
           { label: 'Active', count: activeBookings.length },
           { label: 'Completed', count: completedBookings.length },
         ].map(tab => (
@@ -405,41 +341,34 @@ export default function UserDashboard() {
       </div>
 
       <div className="space-y-5">
-        {mockBookings.map(booking => (
+        {myBookings.map(booking => (
           <div key={booking.id} className="glass-card rounded-3xl overflow-hidden hover:border-[#3B82F6]/40 dark:hover:border-[#3B82F6]/40 transition-all">
             <div className="p-6 md:p-8">
               <div className="flex flex-col md:flex-row gap-6 mb-6">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#3B82F6] to-[#06B6D4] flex items-center justify-center flex-shrink-0 font-bold text-white text-xl shadow-lg">
-                  {booking.workerImage}
+                  {booking.workerName ? booking.workerName.substring(0, 2).toUpperCase() : 'W'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
-                    <h4 className="font-syne font-bold text-xl text-gray-900 dark:text-white">{booking.workerName}</h4>
+                    <h4 className="font-syne font-bold text-xl text-gray-900 dark:text-white">{booking.workerName || 'Worker'}</h4>
                     <span className={`px-2.5 py-1 rounded-md text-[10px] font-medium uppercase tracking-wider flex-shrink-0 ${
-                      booking.status === 'active' 
+                      booking.status !== 'completed' 
                         ? 'bg-[#3B82F6]/10 border border-[#3B82F6]/20 text-[#3B82F6]' 
                         : 'bg-[#10B981]/10 border border-[#10B981]/20 text-[#10B981]'
                     }`}>
-                      {booking.status === 'active' ? 'In Progress' : 'Completed'}
+                      {booking.status === 'pending' || booking.status === 'accepted' ? 'In Progress' : booking.status}
                     </span>
                   </div>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">{booking.serviceIcon} {booking.service}</p>
-                  <p className="text-gray-500 text-xs flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {booking.scheduledAt}</p>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">{booking.service}</p>
+                  <p className="text-gray-500 text-xs flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {booking.date}, {booking.time}</p>
                 </div>
                 <div className="text-left md:text-right">
-                  <p className="font-bold text-[#06B6D4] text-2xl mb-1">₹{booking.amount}</p>
-                  {booking.duration && <p className="text-gray-500 text-xs flex items-center gap-1 md:justify-end"><Clock3 className="w-3 h-3" /> {booking.duration}</p>}
+                  <p className="font-bold text-[#06B6D4] text-2xl mb-1">₹{booking.totalAmount}</p>
                 </div>
               </div>
 
-              {booking.notes && (
-                <div className="mb-6 p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 text-sm text-gray-700 dark:text-gray-300">
-                  <span className="text-[#3B82F6] mr-2">"</span>{booking.notes}<span className="text-[#3B82F6] ml-2">"</span>
-                </div>
-              )}
-
               <div className="flex flex-wrap gap-3 pt-6 border-t border-gray-100 dark:border-white/5">
-                {booking.status === 'active' && (
+                {(booking.status === 'pending' || booking.status === 'accepted') && (
                   <>
                     <button className="flex-1 px-4 py-3 glass-card border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-500/10 transition-colors text-sm font-medium min-w-[140px]">
                       Cancel Booking
@@ -546,12 +475,12 @@ export default function UserDashboard() {
         <div key={booking.id} className="glass-card rounded-2xl p-6 hover:border-[#3B82F6]/30 dark:hover:border-[#3B82F6]/30 transition-colors">
           <div className="flex flex-col sm:flex-row sm:items-center gap-5 mb-5">
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#06B6D4] flex items-center justify-center flex-shrink-0 font-bold text-white text-lg shadow-lg">
-              {booking.workerImage}
+              {booking.workerName ? booking.workerName.substring(0, 2).toUpperCase() : 'W'}
             </div>
             <div className="flex-1">
               <h4 className="text-gray-900 dark:text-white font-syne font-bold text-lg">{booking.workerName}</h4>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">{booking.serviceIcon} {booking.service}</p>
-              <p className="text-gray-400 dark:text-gray-500 text-xs mt-1.5"><Clock className="w-3 h-3 inline mr-1" />{booking.completedAt}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">{booking.service}</p>
+              <p className="text-gray-400 dark:text-gray-500 text-xs mt-1.5"><Clock className="w-3 h-3 inline mr-1" />{booking.date || 'Recent'}</p>
             </div>
             <div className="text-left sm:text-right mt-2 sm:mt-0 glass-card px-4 py-2 rounded-xl w-fit sm:w-auto">
               <div className="flex gap-1 mb-1 justify-start sm:justify-end">
