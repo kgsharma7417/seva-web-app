@@ -13,9 +13,19 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login, signup, loginWithGoogle } = useAuth();
+  const { login, signup, loginWithGoogle, currentUser, userRole } = useAuth();
   const navigate = useNavigate();
   const { t } = useLanguage();
+
+  React.useEffect(() => {
+    if (currentUser && userRole) {
+      if (userRole === 'worker') {
+        navigate('/worker-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [currentUser, userRole, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,10 +35,10 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         await login(email, password);
-        navigate('/');
+        // Navigation will be handled by useEffect
       } else {
         await signup(email, password, name, isWorker);
-        navigate('/');
+        // Navigation will be handled by useEffect
       }
     } catch (err) {
       setError(err.message || 'Failed to authenticate');
@@ -41,7 +51,7 @@ export default function AuthPage() {
       setError('');
       setLoading(true);
       await loginWithGoogle(isWorker);
-      navigate('/');
+      // Navigation will be handled by useEffect
     } catch (err) {
       setError(err.message || 'Failed to authenticate with Google');
     }
@@ -72,8 +82,27 @@ export default function AuthPage() {
 
         {/* Auth Card */}
         <div className="glass-card rounded-3xl p-8 shadow-2xl border-gray-200 dark:border-white/5 animate-fade-up animate-delay-100 bg-white/90 dark:bg-white/5">
+          
+          {/* User Type Toggle */}
+          <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-xl mb-6">
+            <button
+              onClick={() => setIsWorker(false)}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${!isWorker ? 'bg-white dark:bg-[#3B82F6] text-[#3B82F6] dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            >
+              Customer
+            </button>
+            <button
+              onClick={() => setIsWorker(true)}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${isWorker ? 'bg-white dark:bg-[#10B981] text-[#10B981] dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            >
+              Worker
+            </button>
+          </div>
+
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-            {isLogin ? t('auth_welcome') : t('auth_create')}
+            {isLogin 
+              ? (isWorker ? 'Worker Login' : t('auth_welcome')) 
+              : (isWorker ? 'Register as Worker' : t('auth_create'))}
           </h2>
 
           {error && (
@@ -131,22 +160,7 @@ export default function AuthPage() {
               </div>
             </div>
 
-            {!isLogin && (
-              <div className="pt-2">
-                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    checked={isWorker}
-                    onChange={(e) => setIsWorker(e.target.checked)}
-                    className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-[#3B82F6] focus:ring-[#3B82F6]"
-                  />
-                  <div>
-                    <span className="block text-sm font-medium text-gray-900 dark:text-white">{t('auth_reg_worker')}</span>
-                    <span className="block text-xs text-gray-500 dark:text-gray-400">{t('auth_reg_worker_desc')}</span>
-                  </div>
-                </label>
-              </div>
-            )}
+            {/* The checkbox is replaced by the tabs above */}
 
             <button 
               disabled={loading}

@@ -4,9 +4,10 @@ import {
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signOut,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  sendPasswordResetEmail,
+  signOut
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 import app from '../firebase'; // Import the initialized Firebase app
@@ -24,6 +25,7 @@ export function useAuth() {
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
+  const [userData, setUserData] = useState(null);
   const [userRole, setUserRole] = useState(null); // 'customer', 'worker', 'admin'
   const [loading, setLoading] = useState(true);
 
@@ -79,9 +81,26 @@ export function AuthProvider({ children }) {
     return result;
   }
 
+  // Update User Profile
+  async function updateUserProfile(updates) {
+    if (!currentUser) throw new Error("No user logged in");
+    
+    // Update in Firestore
+    await setDoc(doc(db, 'users', currentUser.uid), updates, { merge: true });
+    
+    // Update local state
+    setUserData(prev => ({ ...prev, ...updates }));
+  }
+
+  // Reset Password
+  function resetPassword(email) {
+    return sendPasswordResetEmail(auth, email);
+  }
+
   // Log out
   function logout() {
     setUserRole(null);
+    setUserData(null);
     return signOut(auth);
   }
 
@@ -95,17 +114,22 @@ export function AuthProvider({ children }) {
         try {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
-            setUserRole(userDoc.data().role);
+            const data = userDoc.data();
+            setUserRole(data.role);
+            setUserData(data);
           } else {
             // Fallback for edge cases
             setUserRole('customer');
+            setUserData(null);
           }
         } catch (error) {
-          console.error("Error fetching user role:", error);
+          console.error("Error fetching user data:", error);
           setUserRole('customer');
+          setUserData(null);
         }
       } else {
         setUserRole(null);
+        setUserData(null);
       }
       
       setLoading(false);
@@ -116,11 +140,14 @@ export function AuthProvider({ children }) {
 
   const value = {
     currentUser,
+    userData,
     userRole,
     signup,
     login,
     loginWithGoogle,
-    logout
+    logout,
+    updateUserProfile,
+    resetPassword
   };
 
   return (

@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, MapPin, Clock, Phone, MessageCircle, Heart, Share2, Settings, LogOut, Bell, Wallet, History, Award, TrendingUp, ChevronRight, AlertCircle, CheckCircle2, Clock3, MapPinIcon, User } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import EditProfileModal from '../components/profile/EditProfileModal';
+import IDCardModal from '../components/profile/IDCardModal';
+import { getFirestore, collection, query, where, onSnapshot } from 'firebase/firestore';
+import app from '../firebase';
 
 // ============================================================================
 // TYPES
@@ -11,17 +16,7 @@ import { useLanguage } from '../context/LanguageContext';
 // MOCK DATA
 // ============================================================================
 
-const mockUserProfile = {
-  name: 'Raj Kumar',
-  phone: '+91 9876543210',
-  email: 'raj.kumar@example.com',
-  city: 'Agra',
-  area: 'Taj Ganj',
-  avatar: 'RK',
-  memberSince: 'Jan 2024',
-  totalBookings: 12,
-  averageRating: 4.6,
-};
+// Removed static mockUserProfile as we now use real data from AuthContext
 
 const mockBookings = [
   {
@@ -100,16 +95,92 @@ const mockTransactions = [
 export default function UserDashboard() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { userData, currentUser, userRole, logout, resetPassword } = useAuth();
+  
+  React.useEffect(() => {
+    if (!currentUser) {
+      navigate('/auth');
+    }
+  }, [currentUser, navigate]);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isIdModalOpen, setIsIdModalOpen] = useState(false);
+  const [myBookings, setMyBookings] = useState([]);
 
-  const activeBookings = mockBookings.filter(b => b.status === 'active');
-  const completedBookings = mockBookings.filter(b => b.status === 'completed');
-  const totalSpent = mockBookings.reduce((sum, b) => sum + b.amount, 0);
-  const walletBalance = 2500;
+  const db = getFirestore(app);
+
+  React.useEffect(() => {
+    if (currentUser) {
+      const q = query(collection(db, 'bookings'), where('customerId', '==', currentUser.uid));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const bookingsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        // Sort by most recent
+        bookingsList.sort((a, b) => {
+          const timeA = a.createdAt?.seconds || 0;
+          const timeB = b.createdAt?.seconds || 0;
+          return timeB - timeA;
+        });
+        setMyBookings(bookingsList);
+      });
+      return () => unsubscribe();
+    }
+  }, [currentUser, db]);
+
+  // Fallback profile if userData is still loading or incomplete
+  const profile = {
+    name: userData?.name || currentUser?.displayName || 'User',
+    phone: userData?.phone || 'Not provided',
+    email: userData?.email || currentUser?.email || '',
+    city: userData?.city || 'Agra',
+    area: userData?.area || 'Taj Ganj',
+    avatar: userData?.avatar || (userData?.name ? userData.name.substring(0, 2).toUpperCase() : 'U'),
+    memberSince: userData?.createdAt ? new Date(userData.createdAt.seconds * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Recently',
+    totalBookings: 12, // Mocked for now
+    averageRating: 4.6, // Mocked for now
+  };
+
+  const activeBookings = myBookings.filter(b => b.status === 'active' || b.status === 'pending' || b.status === 'accepted');
+  const completedBookings = myBookings.filter(b => b.status === 'completed');
+  const totalSpent = myBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+  const walletBalance = userData?.walletBalance || 0;
+  const transactions = userData?.transactions || mockTransactions;
   const unreadNotifications = 3;
 
-  // ========== PROFILE SECTION ==========
+  const { updateUserProfile } = useAuth();
+  
+  const handleAddMoney = async () => {
+    const amount = prompt("Enter amount to add to wallet (₹):");
+    if (amount && !isNaN(amount) && Number(amount) > 0) {
+      const numAmount = Number(amount);
+      const newTransaction = {
+        id: 'T' + Date.now(),
+        type: 'credit',
+        title: 'Added to Wallet',
+        description: 'Self Deposit',
+        amount: numAmount,
+        date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      };
+      
+      const newBalance = walletBalance + numAmount;
+      const newTransactions = [newTransaction, ...transactions];
+      
+      try {
+        await updateUserProfile({
+          walletBalance: newBalance,
+          transactions: newTransactions
+        });
+        alert(`Successfully added ₹${numAmount} to your wallet!`);
+      } catch (err) {
+        alert("Failed to add money. Please try again.");
+      }
+    }
+  };
+
   const ProfileSection = () => (
     <div className="glass-card rounded-3xl p-8 mb-8 relative overflow-hidden animate-fade-up">
       <div className="absolute top-0 right-0 w-64 h-64 bg-[#3B82F6]/10 rounded-full blur-[80px] -z-10"></div>
@@ -117,31 +188,37 @@ export default function UserDashboard() {
       <div className="flex flex-col md:flex-row items-start justify-between gap-6">
         <div className="flex flex-col md:flex-row gap-6 flex-1 items-start md:items-center">
           <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#3B82F6] to-[#06B6D4] flex items-center justify-center flex-shrink-0 text-white font-bold text-3xl shadow-xl shadow-[#3B82F6]/20">
-            {mockUserProfile.avatar}
+            {profile.avatar}
           </div>
           <div className="flex-1">
-            <h2 className="text-3xl font-syne font-bold text-gray-900 dark:text-white mb-1">{mockUserProfile.name}</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">Member since {mockUserProfile.memberSince}</p>
+            <h2 className="text-3xl font-syne font-bold text-gray-900 dark:text-white mb-1">{profile.name}</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">Member since {profile.memberSince}</p>
             
             <div className="flex gap-8 text-sm mb-5">
               <div>
                 <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Location</p>
                 <p className="text-gray-700 dark:text-gray-300 font-medium flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-[#06B6D4]" />
-                  {mockUserProfile.area}, {mockUserProfile.city}
+                  {profile.area}, {profile.city}
                 </p>
               </div>
               <div>
                 <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Contact</p>
-                <p className="text-gray-700 dark:text-gray-300 font-medium">{mockUserProfile.phone}</p>
+                <p className="text-gray-700 dark:text-gray-300 font-medium">{profile.phone}</p>
               </div>
             </div>
 
             <div className="flex gap-3">
-              <button className="px-5 py-2.5 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white rounded-xl hover:scale-[1.02] transition-transform shadow-lg shadow-[#3B82F6]/25 text-sm font-medium">
+              <button 
+                onClick={() => setIsEditModalOpen(true)}
+                className="px-5 py-2.5 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white rounded-xl hover:scale-[1.02] transition-transform shadow-lg shadow-[#3B82F6]/25 text-sm font-medium"
+              >
                 Edit Profile
               </button>
-              <button className="px-5 py-2.5 glass-card text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-white/10 transition-colors text-sm font-medium">
+              <button 
+                onClick={() => setIsIdModalOpen(true)}
+                className="px-5 py-2.5 glass-card text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-white/10 transition-colors text-sm font-medium"
+              >
                 View ID
               </button>
             </div>
@@ -151,85 +228,122 @@ export default function UserDashboard() {
         <div className="text-left md:text-right glass-card px-6 py-4 rounded-2xl">
           <div className="flex items-center gap-1 mb-1">
             {[...Array(5)].map((_, i) => (
-              <Star key={i} className={`w-4 h-4 ${i < Math.floor(mockUserProfile.averageRating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`} />
+              <Star key={i} className={`w-4 h-4 ${i < Math.floor(profile.averageRating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`} />
             ))}
           </div>
-          <p className="text-gray-900 dark:text-white font-syne font-bold text-2xl">{mockUserProfile.averageRating}</p>
-          <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">{mockUserProfile.totalBookings} total bookings</p>
+          <p className="text-gray-900 dark:text-white font-syne font-bold text-2xl">{profile.averageRating}</p>
+          <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">{myBookings.length} total bookings</p>
         </div>
       </div>
     </div>
   );
 
-  // ========== OVERVIEW TAB ==========
   const OverviewTab = () => (
     <div className="space-y-8">
       <ProfileSection />
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-up animate-delay-100">
-        {[
-          { label: 'Active Bookings', value: activeBookings.length, icon: Clock3, color: 'text-[#3B82F6]', bg: 'bg-[#3B82F6]/5 dark:bg-[#3B82F6]/10 border-[#3B82F6]/20' },
-          { label: 'Total Spent', value: `₹${totalSpent}`, icon: TrendingUp, color: 'text-[#06B6D4]', bg: 'bg-[#06B6D4]/5 dark:bg-[#06B6D4]/10 border-[#06B6D4]/20' },
-          { label: 'Wallet Balance', value: `₹${walletBalance}`, icon: Wallet, color: 'text-[#10B981]', bg: 'bg-[#10B981]/5 dark:bg-[#10B981]/10 border-[#10B981]/20' },
-          { label: 'Jobs Completed', value: completedBookings.length, icon: Award, color: 'text-[#8B5CF6]', bg: 'bg-[#8B5CF6]/5 dark:bg-[#8B5CF6]/10 border-[#8B5CF6]/20' },
-        ].map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <div key={i} className={`glass-card rounded-2xl p-6 border ${stat.bg} relative overflow-hidden group hover:scale-[1.02] transition-transform`}>
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">{stat.label}</p>
-                <Icon className={`w-5 h-5 ${stat.color}`} />
-              </div>
-              <p className="text-3xl font-syne font-bold text-gray-900 dark:text-white">{stat.value}</p>
-              <div className={`absolute -right-6 -bottom-6 opacity-[0.03] ${stat.color} group-hover:scale-110 transition-transform`}>
-                <Icon className="w-24 h-24" />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex-1 space-y-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {[
+              { label: 'Active Bookings', value: activeBookings.length, icon: Clock3, color: 'text-[#3B82F6]', bg: 'bg-[#3B82F6]/5 dark:bg-[#3B82F6]/10 border-[#3B82F6]/20' },
+              { label: 'Total Spent', value: `₹${totalSpent}`, icon: TrendingUp, color: 'text-[#06B6D4]', bg: 'bg-[#06B6D4]/5 dark:bg-[#06B6D4]/10 border-[#06B6D4]/20' },
+              { label: 'Wallet Balance', value: `₹${walletBalance}`, icon: Wallet, color: 'text-[#10B981]', bg: 'bg-[#10B981]/5 dark:bg-[#10B981]/10 border-[#10B981]/20' },
+              { label: 'Jobs Completed', value: completedBookings.length, icon: Award, color: 'text-[#8B5CF6]', bg: 'bg-[#8B5CF6]/5 dark:bg-[#8B5CF6]/10 border-[#8B5CF6]/20' },
+            ].map((stat, i) => {
+              const Icon = stat.icon;
+              return (
+                <div key={i} className={`glass-card rounded-2xl p-6 border ${stat.bg} relative overflow-hidden group hover:scale-[1.02] transition-transform`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">{stat.label}</p>
+                    <Icon className={`w-5 h-5 ${stat.color}`} />
+                  </div>
+                  <p className="text-3xl font-syne font-bold text-gray-900 dark:text-white">{stat.value}</p>
+                </div>
+              );
+            })}
+          </div>
 
-      {/* Active Bookings Section */}
-      {activeBookings.length > 0 && (
-        <div className="animate-fade-up animate-delay-200">
-          <h3 className="font-syne font-bold text-xl text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[#3B82F6]" /> Active Bookings
-          </h3>
-          <div className="space-y-4">
-            {activeBookings.map(booking => (
-              <div key={booking.id} className="glass-card rounded-2xl p-6 border-l-4 border-l-[#3B82F6] hover:border-[#3B82F6]/50 transition-colors">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-5 gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="text-3xl bg-gray-50 dark:bg-white/5 w-14 h-14 flex items-center justify-center rounded-xl">{booking.serviceIcon}</div>
-                    <div>
-                      <h4 className="text-gray-900 dark:text-white font-syne font-bold text-lg">{booking.workerName}</h4>
-                      <p className="text-gray-500 dark:text-gray-400 text-sm">{booking.service} • {booking.scheduledAt}</p>
+          <div className="animate-fade-up">
+            <h3 className="font-syne font-bold text-xl text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-[#3B82F6]" /> Active Bookings
+            </h3>
+            <div className="space-y-4">
+              {activeBookings.length === 0 ? (
+                <div className="glass-card p-8 rounded-3xl text-center">
+                  <p className="text-gray-500">You have no active bookings.</p>
+                </div>
+              ) : activeBookings.map((booking, i) => (
+                <div key={booking.id || i} className="glass-card rounded-3xl p-6 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#3B82F6]/10 to-[#06B6D4]/10 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+                  
+                  <div className="flex flex-col md:flex-row justify-between gap-6 relative z-10">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${booking.status === 'pending' ? 'bg-yellow-500/10 text-yellow-600' : 'bg-[#3B82F6]/10 text-[#3B82F6]'}`}>
+                          {booking.status}
+                        </span>
+                        <span className="text-gray-400 text-sm">ID: #{booking.id?.slice(-6).toUpperCase()}</span>
+                      </div>
+                      
+                      <h3 className="font-syne font-bold text-xl text-gray-900 dark:text-white mb-4">{booking.service}</h3>
+                      
+                      <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
+                        <div>
+                          <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Date & Time</p>
+                          <p className="text-gray-900 dark:text-white font-medium flex items-center gap-1.5"><CalendarIcon className="w-4 h-4 text-[#3B82F6]" /> {booking.date}, {booking.time}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Worker</p>
+                          <p className="text-gray-900 dark:text-white font-medium flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#3B82F6] to-[#06B6D4] text-[10px] text-white flex items-center justify-center font-bold">{booking.workerName?.charAt(0) || 'W'}</div>
+                            {booking.workerName}
+                          </p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Total Amount</p>
+                          <p className="text-[#10B981] font-bold text-lg">₹{booking.totalAmount}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-left md:text-right">
-                    <p className="font-bold text-[#06B6D4] text-xl">₹{booking.amount}</p>
-                    <span className="inline-block px-3 py-1 bg-[#3B82F6]/10 border border-[#3B82F6]/20 text-[#3B82F6] text-[10px] uppercase tracking-wider font-medium rounded-md mt-1">
-                      On the way
-                    </span>
-                  </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3 border-t border-gray-100 dark:border-white/5 pt-5">
-                  <button className="px-3 py-2.5 glass-card text-gray-900 dark:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-sm font-medium flex items-center justify-center gap-2">
-                    <Phone className="w-4 h-4 text-[#3B82F6]" /> Call
-                  </button>
-                  <button className="px-3 py-2.5 glass-card text-gray-900 dark:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-sm font-medium flex items-center justify-center gap-2">
-                    <MapPinIcon className="w-4 h-4 text-[#10B981]" /> Track
-                  </button>
-                  <button className="px-3 py-2.5 glass-card text-gray-900 dark:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-sm font-medium flex items-center justify-center gap-2">
-                    <MessageCircle className="w-4 h-4 text-[#8B5CF6]" /> Chat
-                  </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 glass-card p-6 rounded-3xl">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-syne font-bold text-lg text-gray-900 dark:text-white">Recent Activity</h3>
+            <button onClick={() => setActiveTab('bookings')} className="text-[#3B82F6] text-sm font-medium hover:underline">View All</button>
+          </div>
+          <div className="space-y-4">
+            {myBookings.slice(0, 3).map((booking, i) => (
+              <div key={booking.id || i} className="flex items-start gap-4 p-4 rounded-2xl bg-white/50 dark:bg-white/5 border border-gray-100 dark:border-white/5 hover:border-[#3B82F6]/30 transition-colors cursor-pointer">
+                <div className="w-10 h-10 rounded-full bg-[#3B82F6]/10 text-[#3B82F6] flex items-center justify-center flex-shrink-0 font-bold">
+                  {booking.workerName?.charAt(0) || 'S'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="font-bold text-gray-900 dark:text-white text-sm truncate pr-2">{booking.service}</h4>
+                    <span className="text-[#10B981] font-bold text-sm whitespace-nowrap">₹{booking.totalAmount}</span>
+                  </div>
+                  <p className="text-gray-500 text-xs mb-1 truncate">with {booking.workerName}</p>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-gray-400 flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {booking.date || 'Soon'}</span>
+                    <span className={`px-2 py-0.5 rounded-full capitalize ${booking.status === 'completed' ? 'bg-[#10B981]/10 text-[#10B981]' : (booking.status === 'cancelled' ? 'bg-red-500/10 text-red-500' : 'bg-[#3B82F6]/10 text-[#3B82F6]')}`}>{booking.status}</span>
+                  </div>
                 </div>
               </div>
             ))}
+            {myBookings.length === 0 && (
+              <div className="text-center py-6">
+                <p className="text-gray-500 text-sm">No recent activity found.</p>
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Recent Completed Bookings */}
       <div className="animate-fade-up animate-delay-300">
@@ -365,7 +479,10 @@ export default function UserDashboard() {
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-2 font-medium tracking-wide">Available Balance</p>
           <h2 className="text-5xl font-syne font-bold mb-10 tracking-tight text-gray-900 dark:text-white">₹{walletBalance}</h2>
           <div className="flex flex-wrap gap-4">
-            <button className="flex-1 px-5 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-[#060D1F] rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-bold text-sm min-w-[140px] shadow-lg dark:shadow-xl">
+            <button 
+              onClick={handleAddMoney}
+              className="flex-1 px-5 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-[#060D1F] rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-bold text-sm min-w-[140px] shadow-lg dark:shadow-xl"
+            >
               Add Money
             </button>
             <button className="flex-1 px-5 py-3.5 glass-card text-gray-900 dark:text-white rounded-xl hover:bg-gray-50 dark:hover:bg-white/10 transition-colors font-medium text-sm min-w-[140px]">
@@ -382,7 +499,9 @@ export default function UserDashboard() {
       <div>
         <h3 className="font-syne font-bold text-xl text-gray-900 dark:text-white mb-6">Transaction History</h3>
         <div className="space-y-3">
-          {mockTransactions.map((transaction, i) => {
+          {transactions.length === 0 ? (
+            <p className="text-gray-500 text-sm py-4">No recent transactions.</p>
+          ) : transactions.map((transaction, i) => {
             const isDebit = transaction.type === 'debit';
             const isCredit = transaction.type === 'credit';
             const isRefund = transaction.type === 'refund';
@@ -485,23 +604,37 @@ export default function UserDashboard() {
           <div className="pb-6 border-b border-gray-200 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <p className="text-gray-700 dark:text-gray-300 font-medium mb-1">Email Address</p>
-              <p className="text-gray-500 text-sm">{mockUserProfile.email}</p>
+              <p className="text-gray-500 text-sm">{profile.email}</p>
             </div>
-            <button className="text-[#06B6D4] text-sm font-medium hover:text-gray-900 dark:hover:text-white transition-colors glass-card px-4 py-2 rounded-lg">Change</button>
+            <button className="text-[#06B6D4] text-sm font-medium hover:text-gray-900 dark:hover:text-white transition-colors glass-card px-4 py-2 rounded-lg" onClick={() => setIsEditModalOpen(true)}>Change</button>
           </div>
           <div className="pb-6 border-b border-gray-200 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <p className="text-gray-700 dark:text-gray-300 font-medium mb-1">Phone Number</p>
-              <p className="text-gray-500 text-sm">{mockUserProfile.phone}</p>
+              <p className="text-gray-500 text-sm">{profile.phone}</p>
             </div>
-            <button className="text-[#06B6D4] text-sm font-medium hover:text-gray-900 dark:hover:text-white transition-colors glass-card px-4 py-2 rounded-lg">Change</button>
+            <button className="text-[#06B6D4] text-sm font-medium hover:text-gray-900 dark:hover:text-white transition-colors glass-card px-4 py-2 rounded-lg" onClick={() => setIsEditModalOpen(true)}>Change</button>
           </div>
           <div className="pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <p className="text-gray-700 dark:text-gray-300 font-medium mb-1">Password</p>
               <p className="text-gray-500 text-sm">Last changed 3 months ago</p>
             </div>
-            <button className="text-[#06B6D4] text-sm font-medium hover:text-gray-900 dark:hover:text-white transition-colors glass-card px-4 py-2 rounded-lg">Update</button>
+            <button 
+              onClick={async () => {
+                if (profile.email) {
+                  try {
+                    await resetPassword(profile.email);
+                    alert("Password reset link sent to your email!");
+                  } catch (e) {
+                    alert("Failed to send reset email.");
+                  }
+                }
+              }}
+              className="text-[#06B6D4] text-sm font-medium hover:text-gray-900 dark:hover:text-white transition-colors glass-card px-4 py-2 rounded-lg"
+            >
+              Update
+            </button>
           </div>
         </div>
       </div>
@@ -528,11 +661,24 @@ export default function UserDashboard() {
 
       {/* Danger Zone */}
       <div className="bg-red-50 dark:bg-red-500/5 border border-red-200 dark:border-red-500/20 rounded-3xl p-8">
-        <h3 className="font-syne font-bold text-xl text-red-600 dark:text-red-400 mb-4">Danger Zone</h3>
-        <p className="text-gray-600 dark:text-gray-500 text-sm mb-6">Permanently remove your account and all data. This action is not reversible.</p>
-        <button className="px-6 py-3 bg-red-100 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-600 hover:text-white transition-colors font-medium">
-          Delete Account
-        </button>
+        <h3 className="font-syne font-bold text-xl text-red-600 dark:text-red-400 mb-4 flex items-center gap-2"><AlertCircle className="w-5 h-5"/> Danger Zone</h3>
+        <p className="text-gray-600 dark:text-gray-500 text-sm mb-6">Log out of your account or permanently delete your data.</p>
+        
+        <div className="flex flex-col sm:flex-row gap-4">
+          <button 
+            onClick={async () => {
+              await logout();
+              navigate('/auth');
+            }}
+            className="flex-1 px-6 py-3 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-white/10 transition-colors font-medium flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-4 h-4"/> Log Out
+          </button>
+          
+          <button className="flex-1 px-6 py-3 bg-red-100 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-600 hover:text-white transition-colors font-medium">
+            Delete Account
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -588,11 +734,20 @@ export default function UserDashboard() {
               )}
             </div>
 
-            <button className="p-2.5 rounded-xl glass-card text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors hidden sm:block">
+            <button 
+              onClick={() => setActiveTab('settings')}
+              className="p-2.5 rounded-xl glass-card text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors hidden sm:block"
+            >
               <Settings className="w-5 h-5" />
             </button>
-            <button className="p-2.5 rounded-xl glass-card text-gray-500 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 dark:hover:text-red-400 dark:hover:bg-red-500/10 dark:hover:border-red-500/30 transition-colors hidden sm:block">
-              <LogOut className="w-5 h-5" />
+            <button 
+              onClick={async () => {
+                await logout();
+                navigate('/auth');
+              }}
+              className="px-4 py-2.5 rounded-xl glass-card text-gray-500 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 dark:hover:text-red-400 dark:hover:bg-red-500/10 dark:hover:border-red-500/30 transition-colors hidden sm:flex items-center gap-2 text-sm font-bold"
+            >
+              <LogOut className="w-4 h-4" /> Log Out
             </button>
           </div>
         </div>
@@ -644,6 +799,9 @@ export default function UserDashboard() {
           {activeTab === 'settings' && <SettingsTab />}
         </div>
       </div>
+
+      <EditProfileModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} />
+      <IDCardModal isOpen={isIdModalOpen} onClose={() => setIsIdModalOpen(false)} profile={profile} />
     </div>
   );
 }

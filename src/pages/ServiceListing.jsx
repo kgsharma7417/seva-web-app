@@ -1,15 +1,29 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star, MapPin, Clock, Heart, MessageCircle, Search, Filter, Zap, Wrench, Droplets, Sparkles, ChevronLeft } from 'lucide-react';
+import { Star, MapPin, Clock, Heart, MessageCircle, Search, Filter, Zap, Wrench, Droplets, Sparkles, ChevronLeft, Navigation } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useLocation } from '../context/LocationContext';
+
+// Helper function to calculate distance using Haversine formula
+function getDistanceInKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * (Math.PI/180);
+  const dLon = (lon2 - lon1) * (Math.PI/180); 
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  return R * c; 
+}
 
 const mockWorkers = [
-  { id: '1', name: 'Ramesh Kumar', service: 'ac-repair', specialty: 'AC Technician', rating: 4.9, reviews: 142, experience: '7 yrs', hourlyRate: 299, responseTime: '~12 min', responseTimeMinutes: 12, verified: true, image: 'RK', area: 'Agra City' },
-  { id: '2', name: 'Suresh Plumber', service: 'plumbing', specialty: 'Plumber', rating: 4.8, reviews: 89, experience: '11 yrs', hourlyRate: 249, responseTime: '~8 min', responseTimeMinutes: 8, verified: true, image: 'SP', area: 'Taj Ganj' },
-  { id: '3', name: 'Arjun Electrician', service: 'electrical', specialty: 'Electrician', rating: 4.7, reviews: 156, experience: '9 yrs', hourlyRate: 279, responseTime: '~15 min', responseTimeMinutes: 15, verified: true, image: 'AE', area: 'Sadar Bazar' },
-  { id: '4', name: 'Priya Cleaning', service: 'cleaning', specialty: 'House Cleaning', rating: 4.6, reviews: 203, experience: '5 yrs', hourlyRate: 199, responseTime: '~10 min', responseTimeMinutes: 10, verified: true, image: 'PC', area: 'Fatehpur Sikri Road' },
-  { id: '5', name: 'Vikram Carpenter', service: 'carpentry', specialty: 'Carpenter', rating: 4.8, reviews: 78, experience: '13 yrs', hourlyRate: 329, responseTime: '~20 min', responseTimeMinutes: 20, verified: true, image: 'VC', area: 'Civil Lines' },
-  { id: '6', name: 'Deepak Painter', service: 'painting', specialty: 'Painter', rating: 4.5, reviews: 112, experience: '8 yrs', hourlyRate: 259, responseTime: '~18 min', responseTimeMinutes: 18, verified: true, image: 'DP', area: 'Shilpgram' },
+  { id: '1', name: 'Ramesh Kumar', service: 'ac-repair', specialty: 'AC Technician', rating: 4.9, reviews: 142, experience: '7 yrs', hourlyRate: 299, responseTime: '~12 min', responseTimeMinutes: 12, verified: true, image: 'RK', area: 'Agra City', coordinates: { lat: 27.1767, lng: 78.0081 } },
+  { id: '2', name: 'Suresh Plumber', service: 'plumbing', specialty: 'Plumber', rating: 4.8, reviews: 89, experience: '11 yrs', hourlyRate: 249, responseTime: '~8 min', responseTimeMinutes: 8, verified: true, image: 'SP', area: 'Taj Ganj', coordinates: { lat: 27.1691, lng: 78.0421 } },
+  { id: '3', name: 'Arjun Electrician', service: 'electrical', specialty: 'Electrician', rating: 4.7, reviews: 156, experience: '9 yrs', hourlyRate: 279, responseTime: '~15 min', responseTimeMinutes: 15, verified: true, image: 'AE', area: 'Sadar Bazar', coordinates: { lat: 27.1561, lng: 78.0175 } },
+  { id: '4', name: 'Priya Cleaning', service: 'cleaning', specialty: 'House Cleaning', rating: 4.6, reviews: 203, experience: '5 yrs', hourlyRate: 199, responseTime: '~10 min', responseTimeMinutes: 10, verified: true, image: 'PC', area: 'Fatehpur Sikri Road', coordinates: { lat: 27.0921, lng: 77.6713 } },
+  { id: '5', name: 'Vikram Carpenter', service: 'carpentry', specialty: 'Carpenter', rating: 4.8, reviews: 78, experience: '13 yrs', hourlyRate: 329, responseTime: '~20 min', responseTimeMinutes: 20, verified: true, image: 'VC', area: 'Civil Lines', coordinates: { lat: 27.1950, lng: 78.0200 } },
+  { id: '6', name: 'Deepak Painter', service: 'painting', specialty: 'Painter', rating: 4.5, reviews: 112, experience: '8 yrs', hourlyRate: 259, responseTime: '~18 min', responseTimeMinutes: 18, verified: true, image: 'DP', area: 'Shilpgram', coordinates: { lat: 27.1650, lng: 78.0550 } },
 ];
 
 const AREAS = ['All Areas', 'Agra City', 'Taj Ganj', 'Sadar Bazar', 'Civil Lines', 'Fatehpur Sikri Road', 'Shilpgram'];
@@ -23,10 +37,11 @@ const PRICE_RANGES = [
 export default function ServiceListing() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { userLocation } = useLocation();
   const [selectedService, setSelectedService] = useState('');
   const [selectedArea, setSelectedArea] = useState('All Areas');
   const [priceRange, setPriceRange] = useState({ min: 0, max: 9999 });
-  const [sortBy, setSortBy] = useState('rating');
+  const [sortBy, setSortBy] = useState('distance');
   const [favorites, setFavorites] = useState(new Set());
 
   const SERVICES = [
@@ -39,17 +54,27 @@ export default function ServiceListing() {
   ];
 
   const filteredWorkers = useMemo(() => {
-    let filtered = mockWorkers;
+    let filtered = mockWorkers.map(w => {
+      // Calculate distance to this worker
+      const userCoords = userLocation.coordinates;
+      let dist = 0;
+      if (userCoords && w.coordinates) {
+        dist = getDistanceInKm(userCoords.lat, userCoords.lng, w.coordinates.lat, w.coordinates.lng);
+      }
+      return { ...w, distanceKm: dist };
+    });
+
     if (selectedService) filtered = filtered.filter(w => w.service === selectedService);
     if (selectedArea !== 'All Areas') filtered = filtered.filter(w => w.area === selectedArea);
     filtered = filtered.filter(w => w.hourlyRate >= priceRange.min && w.hourlyRate <= priceRange.max);
 
-    if (sortBy === 'rating') filtered.sort((a, b) => b.rating - a.rating);
+    if (sortBy === 'distance') filtered.sort((a, b) => a.distanceKm - b.distanceKm);
+    else if (sortBy === 'rating') filtered.sort((a, b) => b.rating - a.rating);
     else if (sortBy === 'response') filtered.sort((a, b) => a.responseTimeMinutes - b.responseTimeMinutes);
     else if (sortBy === 'price') filtered.sort((a, b) => a.hourlyRate - b.hourlyRate);
 
     return filtered;
-  }, [selectedService, selectedArea, priceRange, sortBy]);
+  }, [selectedService, selectedArea, priceRange, sortBy, userLocation]);
 
   const toggleFavorite = (workerId) => {
     const newFavorites = new Set(favorites);
@@ -175,6 +200,7 @@ export default function ServiceListing() {
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">{t('sl_sort_by')}</h3>
                 <div className="space-y-2">
                   {[
+                    { id: 'distance', label: 'Nearest to Me' },
                     { id: 'rating', label: 'Highest Rating' },
                     { id: 'response', label: 'Fastest Response' },
                     { id: 'price', label: 'Lowest Price' },
@@ -235,6 +261,16 @@ export default function ServiceListing() {
                           <span className="flex items-center gap-1.5">
                             <MapPin className="w-3.5 h-3.5 text-[#06B6D4]" />
                             {worker.area}
+                          </span>
+                          <span className="flex items-center gap-1.5 bg-[#06B6D4]/10 text-[#06B6D4] px-2 py-0.5 rounded-full font-medium">
+                            <Navigation className="w-3 h-3" />
+                            {worker.distanceKm.toFixed(1)} km away
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-[#3B82F6]" />
+                            {worker.responseTime}
                           </span>
                           <span className="flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5 text-[#3B82F6]" />

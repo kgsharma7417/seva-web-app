@@ -41,29 +41,32 @@ const ScrollToTop = () => {
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { LocationProvider } from './context/LocationContext';
 import AuthPage from './pages/Auth';
 
 function App() {
   return (
     <ThemeProvider>
       <LanguageProvider>
-        <AuthProvider>
-          <Router>
-            <ScrollToTop />
-            <Routes>
-              <Route path="/" element={<Homepage />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route path="/listing" element={<ServiceListing />} />
-              <Route path="/worker" element={<WorkerProfile />} />
-              <Route path="/dashboard" element={<UserDashboard />} />
-              <Route path="/worker-dashboard" element={<WorkerDashboard />} />
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/review" element={<ReviewForm />} />
-              <Route path="/booking" element={<BookingFlow />} />
-            </Routes>
-            <FloatingNav />
-          </Router>
-        </AuthProvider>
+        <LocationProvider>
+          <AuthProvider>
+            <Router>
+              <ScrollToTop />
+              <Routes>
+                <Route path="/" element={<Homepage />} />
+                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/listing" element={<ServiceListing />} />
+                <Route path="/worker" element={<WorkerProfile />} />
+                <Route path="/dashboard" element={<UserDashboard />} />
+                <Route path="/worker-dashboard" element={<WorkerDashboard />} />
+                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/review" element={<ReviewForm />} />
+                <Route path="/booking" element={<BookingFlow />} />
+              </Routes>
+              <FloatingNav />
+            </Router>
+          </AuthProvider>
+        </LocationProvider>
       </LanguageProvider>
     </ThemeProvider>
   );

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, CreditCard, Camera, CheckCircle2, Shield, Info, Smartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import app from '../firebase';
 
 export default function BookingFlow() {
   const navigate = useNavigate();
@@ -13,6 +15,9 @@ export default function BookingFlow() {
   const [selectedDate, setSelectedDate] = useState('Tomorrow, 12 Oct');
   const [selectedTime, setSelectedTime] = useState('10:00 AM');
   const [paymentMethod, setPaymentMethod] = useState('upi');
+  const [bookingId, setBookingId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const db = getFirestore(app);
 
   const worker = {
     name: 'Ramesh Kumar',
@@ -22,15 +27,44 @@ export default function BookingFlow() {
     avatar: 'RK'
   };
 
-  const nextStep = () => {
-    if (step < 3) setStep(step + 1);
-    else {
+  const nextStep = async () => {
+    if (step < 3) {
+      setStep(step + 1);
+    } else {
       if (!currentUser) {
         alert("Please log in to confirm your booking!");
         navigate('/auth');
         return;
       }
-      setIsSuccess(true);
+
+      setIsSubmitting(true);
+      try {
+        const bookingData = {
+          customerId: currentUser.uid,
+          customerName: currentUser.displayName || 'Customer',
+          // Dummy worker for testing worker dashboard
+          workerId: 'dummy_worker_id', 
+          workerName: worker.name,
+          service: worker.service,
+          status: 'pending',
+          date: selectedDate,
+          time: selectedTime,
+          address: 'Flat 402, Taj Residency, Fatehabad Road, Agra',
+          price: worker.price,
+          totalAmount: worker.price + 45,
+          paymentMethod: paymentMethod,
+          createdAt: serverTimestamp()
+        };
+
+        const docRef = await addDoc(collection(db, 'bookings'), bookingData);
+        setBookingId(docRef.id);
+        setIsSuccess(true);
+      } catch (error) {
+        console.error("Error creating booking: ", error);
+        alert("Failed to confirm booking. Please try again.");
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -46,7 +80,7 @@ export default function BookingFlow() {
             <CheckCircle2 className="w-10 h-10 text-white" />
           </div>
           <h2 className="text-2xl font-syne font-bold text-gray-900 dark:text-white mb-2">{t('bf_success')}</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">Your booking ID is #BK-88902.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">Your booking ID is #{bookingId.slice(-6).toUpperCase()}.</p>
           
           <div className="bg-gray-100 dark:bg-white/5 rounded-2xl p-4 text-left mb-6 space-y-3">
             <div className="flex justify-between">
@@ -310,9 +344,10 @@ export default function BookingFlow() {
                 )}
                 <button 
                   onClick={nextStep} 
-                  className="flex-1 py-3.5 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white rounded-xl hover:scale-[1.02] transition-transform font-bold text-sm shadow-lg shadow-[#3B82F6]/20 flex items-center justify-center gap-2"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white rounded-xl hover:scale-[1.02] transition-transform font-bold text-sm shadow-lg shadow-[#3B82F6]/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:hover:scale-100"
                 >
-                  {step === 3 ? t('bf_confirm_pay') : t('btn_continue')} <ChevronRight className="w-4 h-4"/>
+                  {isSubmitting ? 'Confirming...' : (step === 3 ? t('bf_confirm_pay') : t('btn_continue'))} {!isSubmitting && <ChevronRight className="w-4 h-4"/>}
                 </button>
               </div>
 

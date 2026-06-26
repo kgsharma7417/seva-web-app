@@ -1,11 +1,56 @@
-import React, { useState } from 'react';
-import { Calendar as CalendarIcon, Clock, TrendingUp, IndianRupee, Check, X, ChevronLeft, ChevronRight, Star, Settings, LogOut, Bell, Shield, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar as CalendarIcon, Clock, TrendingUp, IndianRupee, Check, X, ChevronLeft, ChevronRight, Star, Settings, LogOut, Bell, Shield, AlertCircle, MapPin } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import app from '../firebase';
+import MapSelector from '../components/common/MapSelector';
 
 export default function WorkerDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [showNotifications, setShowNotifications] = useState(false);
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const db = getFirestore(app);
+  const [allBookings, setAllBookings] = useState([]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      navigate('/auth');
+      return;
+    }
+
+    // Listen to bookings assigned to 'dummy_worker_id' for testing, or the current user's UID
+    const q = query(
+      collection(db, 'bookings'),
+      where('workerId', 'in', ['dummy_worker_id', currentUser.uid])
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const bList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      bList.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setAllBookings(bList);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser, navigate, db]);
+
+  // Derived Data
+  const pendingRequests = allBookings.filter(b => b.status === 'pending');
+  const schedule = allBookings.filter(b => b.status === 'accepted' || b.status === 'active');
+  
+  const handleUpdateStatus = async (bookingId, newStatus) => {
+    try {
+      await updateDoc(doc(db, 'bookings', bookingId), {
+        status: newStatus
+      });
+    } catch (error) {
+      console.error("Error updating status:", error);
+      alert("Failed to update status");
+    }
+  };
 
   // Mock Data
   const workerProfile = {
@@ -15,25 +60,22 @@ export default function WorkerDashboard() {
     avatar: "RK",
     completeness: 85,
     responseRate: "98%",
-    avgResponseTime: "5 mins"
+    avgResponseTime: "5 mins",
+    location: { name: "Agra City", coordinates: { lat: 27.1767, lng: 78.0081 } }
   };
 
+  const [workerLocation, setWorkerLocation] = useState(workerProfile.location);
+  const [isMapOpen, setIsMapOpen] = useState(false);
+
+  const completedJobs = allBookings.filter(b => b.status === 'completed');
+  const totalEarnings = completedJobs.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
+  
   const earnings = {
-    daily: 1250,
-    weekly: 8400,
-    monthly: 32500,
-    walletBalance: 4500,
+    daily: totalEarnings,
+    weekly: totalEarnings,
+    monthly: totalEarnings,
+    walletBalance: totalEarnings,
   };
-
-  const pendingRequests = [
-    { id: 'REQ001', customer: 'Amit Singh', service: 'Split AC Service', time: 'Today, 2:00 PM', location: 'Taj Ganj, Agra', distance: '2.5 km', amount: 499, expires: '10 mins' },
-    { id: 'REQ002', customer: 'Priya Sharma', service: 'Window AC Repair', time: 'Tomorrow, 10:00 AM', location: 'Sadar Bazar, Agra', distance: '4 km', amount: 799, expires: '45 mins' },
-  ];
-
-  const schedule = [
-    { id: 'SCH001', customer: 'Vikram Gupta', service: 'AC Gas Filling', time: 'Today, 11:00 AM - 1:00 PM', location: 'Civil Lines, Agra', amount: 1500, status: 'upcoming' },
-    { id: 'SCH002', customer: 'Amit Singh', service: 'Split AC Service', time: 'Today, 2:00 PM - 3:00 PM', location: 'Taj Ganj, Agra', amount: 499, status: 'pending' }
-  ];
 
   const CircularProgress = ({ value, label, sublabel, colorClass }) => (
     <div className="flex flex-col items-center justify-center p-6 bg-white dark:glass-card border border-gray-200 dark:border-white/5 rounded-3xl relative overflow-hidden group shadow-sm dark:shadow-none">
@@ -201,23 +243,25 @@ export default function WorkerDashboard() {
                   </div>
 
                   <div className="space-y-4">
-                    {schedule.map(job => (
+                    {schedule.length === 0 ? (
+                      <p className="text-sm text-gray-500 py-4">No accepted jobs yet.</p>
+                    ) : schedule.map(job => (
                       <div key={job.id} className="bg-gray-50 border border-gray-200 dark:glass-card dark:border-white/5 rounded-2xl p-5 hover:border-[#3B82F6]/50 dark:hover:border-white/10 transition-colors flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                         <div className="flex items-start gap-4">
                           <div className="glass-card rounded-2xl p-4 flex items-center justify-between group">
-                            {job.time.split(', ')[1].split(' ')[0]}
+                            {job.time}
                           </div>
                           <div>
                             <h4 className="text-gray-900 dark:text-white font-bold">{job.service}</h4>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm">{job.customer} • {job.location}</p>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm">{job.customerName} • {job.address}</p>
                             <span className="inline-block mt-2 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[#3B82F6]/10 text-[#3B82F6] border border-[#3B82F6]/20">
-                              Upcoming
+                              {job.status === 'accepted' ? 'Upcoming' : 'In Progress'}
                             </span>
                           </div>
                         </div>
                         <div className="flex gap-2 w-full md:w-auto">
                            <button className="flex-1 md:flex-none px-4 py-2 bg-white border border-gray-200 dark:glass-card text-gray-900 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 transition-colors text-sm font-medium shadow-sm dark:shadow-none">Navigate</button>
-                           <button className="flex-1 md:flex-none px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors text-sm font-medium">Start Job</button>
+                           <button onClick={() => handleUpdateStatus(job.id, 'completed')} className="flex-1 md:flex-none px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors text-sm font-medium">Complete Job</button>
                         </div>
                       </div>
                     ))}
@@ -291,23 +335,19 @@ export default function WorkerDashboard() {
                       <div className="bg-gray-50 border border-gray-200 dark:border-transparent dark:bg-white/5 rounded-2xl p-4 mb-6">
                         <div className="flex justify-between mb-2">
                           <span className="text-gray-500 text-xs">Customer</span>
-                          <span className="text-gray-900 dark:text-white text-sm font-medium">{req.customer}</span>
+                          <span className="text-gray-900 dark:text-white text-sm font-medium">{req.customerName}</span>
                         </div>
                         <div className="flex justify-between mb-2">
                           <span className="text-gray-500 text-xs">Location</span>
-                          <span className="text-gray-900 dark:text-white text-sm font-medium">{req.location}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500 text-xs">Distance</span>
-                          <span className="text-yellow-600 dark:text-yellow-400 text-sm font-medium">{req.distance} away</span>
+                          <span className="text-gray-900 dark:text-white text-sm font-medium">{req.address}</span>
                         </div>
                       </div>
 
                       <div className="flex gap-3">
-                        <button className="flex-1 py-3.5 bg-white border border-gray-200 dark:glass-card text-gray-700 dark:text-gray-300 rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-500/10 dark:hover:text-red-400 dark:hover:border-red-500/30 transition-colors font-bold text-sm flex items-center justify-center gap-2 shadow-sm dark:shadow-none">
+                        <button onClick={() => handleUpdateStatus(req.id, 'cancelled')} className="flex-1 py-3.5 bg-white border border-gray-200 dark:glass-card text-gray-700 dark:text-gray-300 rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-500/10 dark:hover:text-red-400 dark:hover:border-red-500/30 transition-colors font-bold text-sm flex items-center justify-center gap-2 shadow-sm dark:shadow-none">
                           <X className="w-4 h-4"/> Decline
                         </button>
-                        <button className="flex-1 py-3.5 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl hover:scale-[1.02] transition-transform font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#10B981]/25">
+                        <button onClick={() => handleUpdateStatus(req.id, 'accepted')} className="flex-1 py-3.5 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl hover:scale-[1.02] transition-transform font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#10B981]/25">
                           <Check className="w-4 h-4"/> Accept Job
                         </button>
                       </div>
@@ -418,6 +458,34 @@ export default function WorkerDashboard() {
                     ))}
                   </div>
                 </div>
+
+                {/* Location Settings */}
+                <div className="bg-white dark:glass-card border border-gray-200 dark:border-white/5 rounded-3xl p-8 shadow-sm dark:shadow-none col-span-1 md:col-span-2 mt-2">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h4 className="text-gray-900 dark:text-white font-bold text-lg flex items-center gap-2">
+                        <MapPin className="w-5 h-5 text-[#3B82F6]" />
+                        Service Location
+                      </h4>
+                      <p className="text-sm text-gray-500 mt-1">Set your operating base so customers can find you</p>
+                    </div>
+                    <button 
+                      onClick={() => setIsMapOpen(true)}
+                      className="px-4 py-2 bg-[#3B82F6]/10 text-[#3B82F6] font-bold rounded-xl hover:bg-[#3B82F6]/20 transition-colors"
+                    >
+                      Update Location
+                    </button>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-4 border border-gray-100 dark:border-white/10 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-white dark:bg-[#060D1F] flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-6 h-6 text-[#06B6D4]" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-white">{workerLocation.name}</p>
+                      <p className="text-xs text-gray-500">Lat: {workerLocation.coordinates.lat.toFixed(4)}, Lng: {workerLocation.coordinates.lng.toFixed(4)}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -434,6 +502,13 @@ export default function WorkerDashboard() {
         </div>
         </div>
       </main>
+
+      <MapSelector 
+        isOpen={isMapOpen} 
+        onClose={() => setIsMapOpen(false)} 
+        onSelect={(loc) => { setWorkerLocation(loc); setIsMapOpen(false); }}
+        initialPosition={workerLocation.coordinates}
+      />
     </div>
   );
 }
