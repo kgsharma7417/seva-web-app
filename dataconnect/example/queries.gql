@@ -1,0 +1,44 @@
+mutation CreateBooking($scheduledDate: Timestamp!, $totalCost: Float!, $userId: UUID!, $providerId: UUID!) @auth(level: USER) {
+  booking_insert(data: {
+    scheduledDate: $scheduledDate,
+    totalCost: $totalCost,
+    userId: $userId,
+    providerId: $providerId,
+    status: "PENDING"
+  })
+}
+
+mutation CreateReview($rating: Int!, $comment: String!, $bookingId: UUID!, $userId: UUID!) @auth(level: USER) {
+  review_insert(data: {
+    rating: $rating,
+    comment: $comment,
+    bookingId: $bookingId,
+    userId: $userId,
+    createdAt_expr: "request.time"
+  })
+}
+
+query ListProvidersByCategory($category: String!) @auth(level: PUBLIC) {
+  providers(where: {category: {eq: $category}, isActive: {eq: true}}) {
+    id
+    name
+    rating
+    hourlyRate
+    services_on_provider {
+      title
+      basePrice
+    }
+  }
+}
+
+query GetUserBookings @auth(level: USER) {
+  bookings(where: {userId: {eq_expr: "auth.uid"}}, orderBy: [{scheduledDate: DESC}]) {
+    id
+    status
+    scheduledDate
+    totalCost
+    provider {
+      name
+    }
+  }
+}

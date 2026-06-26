@@ -1,0 +1,40 @@
+type User @table {
+  name: String!
+  phone: String!
+  location: String! # Stored as a coordinate string or address identifier
+  email: String
+  profilePicture: String
+}
+
+type Provider @table {
+  name: String!
+  category: String!
+  rating: Float!
+  isActive: Boolean!
+  bio: String
+  certifications: String
+  hourlyRate: Float
+}
+
+type Service @table {
+  title: String!
+  description: String!
+  basePrice: Float!
+  provider: Provider!
+}
+
+type Booking @table {
+  status: String!
+  scheduledDate: Timestamp!
+  totalCost: Float!
+  user: User!
+  provider: Provider!
+}
+
+type Review @table {
+  rating: Int!
+  comment: String!
+  createdAt: Timestamp!
+  booking: Booking!
+  user: User!
+}

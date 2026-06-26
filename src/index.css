@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-inter: "Inter", sans-serif;
+  --font-syne: "Syne", sans-serif;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+body {
+  margin: 0;
+  font-family: var(--font-inter);
+  @apply bg-gray-50 text-gray-900 dark:bg-[#060D1F] dark:text-white transition-colors duration-300;
+  min-height: 100vh;
+}
+
+.font-syne { font-family: var(--font-syne); }
+.font-inter { font-family: var(--font-inter); }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes drift {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(30px, -50px); }
+  66% { transform: translate(-20px, 20px); }
+  100% { transform: translate(0, 0); }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.8s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-delay-100 { animation-delay: 100ms; }
+.animate-delay-200 { animation-delay: 200ms; }
+.animate-delay-300 { animation-delay: 300ms; }
+.animate-delay-400 { animation-delay: 400ms; }
+.animate-delay-500 { animation-delay: 500ms; }
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: drift 8s infinite alternate ease-in-out;
+  z-index: 0;
+}
+
+.glass-card {
+  @apply bg-white dark:bg-white/5 border border-gray-200/80 dark:border-white/10 shadow-sm dark:shadow-none transition-all duration-300 rounded-2xl;
+}
+
+.glass-card:hover {
+  @apply -translate-y-[3px] border-gray-300 dark:border-white/20 shadow-md dark:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)];
+}
+
+.category-card:hover {
+  --hover-glow: #3B82F6;
+  box-shadow: 0 0 20px -5px var(--hover-glow);
+}
+
+.bg-grid {
+  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+:is(.dark) .bg-grid {
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
