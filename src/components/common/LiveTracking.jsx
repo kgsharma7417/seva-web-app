@@ -138,7 +138,7 @@ export default function LiveTracking({ booking, userLocation }) {
         <div className="absolute top-4 left-4 z-[1000] glass-card bg-white/90 dark:bg-[#060D1F]/90 backdrop-blur-xl px-6 py-3 rounded-2xl shadow-lg border border-gray-200 dark:border-white/10">
           <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-1">Arriving In</p>
           <p className="text-3xl font-syne font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            {eta > 0 ? `${eta} min` : 'Arrived!'}
+            {eta > 0 ? eta + ' min' : 'Arrived!'}
             <span className="relative flex h-3 w-3">
               {eta > 0 && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75"></span>}
               <span className={`relative inline-flex rounded-full h-3 w-3 ${eta > 0 ? 'bg-[#10B981]' : 'bg-gray-400'}`}></span>

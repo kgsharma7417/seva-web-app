@@ -10,8 +10,8 @@ export function ThemeProvider({ children }) {
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme');
     if (saved) return saved === 'dark';
-    // Default to dark mode for existing feel
-    return true; 
+    // Default to light mode for existing feel
+    return false; 
   });
 
   useEffect(() => {

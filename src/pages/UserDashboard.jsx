@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star, MapPin, Clock, Phone, MessageCircle, Heart, Share2, Settings, LogOut, Bell, Wallet, History, Award, TrendingUp, ChevronRight, AlertCircle, CheckCircle2, Clock3, MapPinIcon, User } from 'lucide-react';
+import { Star, MapPin, Clock, Phone, MessageCircle, Heart, Share2, Settings, LogOut, Bell, Wallet, History, Award, TrendingUp, ChevronRight, AlertCircle, CheckCircle2, Clock3, MapPinIcon, User, Calendar as CalendarIcon } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import EditProfileModal from '../components/profile/EditProfileModal';
@@ -238,10 +238,10 @@ export default function UserDashboard() {
                         </div>
                         <div>
                           <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Worker</p>
-                          <p className="text-gray-900 dark:text-white font-medium flex items-center gap-1.5">
+                          <div className="text-gray-900 dark:text-white font-medium flex items-center gap-1.5">
                             <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#3B82F6] to-[#06B6D4] text-[10px] text-white flex items-center justify-center font-bold">{booking.workerName?.charAt(0) || 'W'}</div>
                             {booking.workerName}
-                          </p>
+                          </div>
                         </div>
                         <div className="col-span-2">
                           <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Total Amount</p>
