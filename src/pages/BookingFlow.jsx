@@ -6,6 +6,21 @@ import { useLanguage } from '../context/LanguageContext';
 import { getFirestore, collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import app from '../firebase';
 
+// Generate dynamic dates starting from today
+function generateBookingDates() {
+  const dates = [];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : dayNames[d.getDay()];
+    dates.push(`${label}, ${d.getDate()} ${monthNames[d.getMonth()]}`);
+  }
+  return dates;
+}
+
 export default function BookingFlow() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -13,7 +28,8 @@ export default function BookingFlow() {
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [selectedDate, setSelectedDate] = useState('Tomorrow, 12 Oct');
+  const bookingDates = React.useMemo(() => generateBookingDates(), []);
+  const [selectedDate, setSelectedDate] = useState(() => generateBookingDates()[1]);
   const [selectedTime, setSelectedTime] = useState('10:00 AM');
   const [paymentMethod, setPaymentMethod] = useState('upi');
   const [bookingId, setBookingId] = useState('');
@@ -158,7 +174,7 @@ export default function BookingFlow() {
       <header className="sticky top-0 z-50 bg-white/80 dark:bg-[#060D1F]/80 backdrop-blur-xl border-b border-gray-200 dark:border-white/5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/worker')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 rounded-lg transition-colors">
+            <button onClick={() => navigate(id ? `/worker/${id}` : '/listing')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 rounded-lg transition-colors">
               <ChevronLeft className="w-5 h-5" />
             </button>
             <h1 className="text-lg font-syne font-bold">Book Service</h1>
@@ -228,7 +244,7 @@ export default function BookingFlow() {
                       <CalendarIcon className="w-4 h-4"/> Date
                     </label>
                     <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                      {['Today, 11 Oct', 'Tomorrow, 12 Oct', 'Sat, 13 Oct', 'Sun, 14 Oct'].map(date => (
+                      {bookingDates.map(date => (
                         <button
                           key={date}
                           onClick={() => setSelectedDate(date)}

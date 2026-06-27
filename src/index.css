@@ -18,9 +18,18 @@ body {
 .font-syne { font-family: var(--font-syne); }
 .font-inter { font-family: var(--font-inter); }
 
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes drift {
@@ -30,9 +39,72 @@ body {
   100% { transform: translate(0, 0); }
 }
 
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .animate-fade-up {
   animation: fadeUp 0.8s ease-out forwards;
   opacity: 0;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-slide-right {
+  animation: slideInRight 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-slide-left {
+  animation: slideInLeft 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
 }
 
 .animate-delay-100 { animation-delay: 100ms; }
@@ -40,6 +112,12 @@ body {
 .animate-delay-300 { animation-delay: 300ms; }
 .animate-delay-400 { animation-delay: 400ms; }
 .animate-delay-500 { animation-delay: 500ms; }
+.animate-delay-600 { animation-delay: 600ms; }
+.animate-delay-700 { animation-delay: 700ms; }
+
+/* ========================================
+   ORB BACKGROUND
+   ======================================== */
 
 .orb {
   position: absolute;
@@ -49,6 +127,10 @@ body {
   z-index: 0;
 }
 
+/* ========================================
+   GLASS CARD
+   ======================================== */
+
 .glass-card {
   @apply bg-white dark:bg-white/5 border border-gray-200/80 dark:border-white/10 shadow-sm dark:shadow-none transition-all duration-300 rounded-2xl;
 }
@@ -57,10 +139,22 @@ body {
   @apply -translate-y-[3px] border-gray-300 dark:border-white/20 shadow-md dark:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)];
 }
 
+.glass-card-static {
+  @apply bg-white dark:bg-white/5 border border-gray-200/80 dark:border-white/10 shadow-sm dark:shadow-none transition-colors duration-300 rounded-2xl;
+}
+
+/* ========================================
+   CATEGORY CARD GLOW
+   ======================================== */
+
 .category-card:hover {
   --hover-glow: #3B82F6;
   box-shadow: 0 0 20px -5px var(--hover-glow);
 }
+
+/* ========================================
+   GRID BACKGROUND
+   ======================================== */
 
 .bg-grid {
   background-image: linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
@@ -73,9 +167,123 @@ body {
                     linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
 }
 
+/* ========================================
+   TEXT GRADIENT
+   ======================================== */
+
 .text-gradient {
   background: linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* ========================================
+   SKELETON LOADING
+   ======================================== */
+
+.skeleton {
+  background: linear-gradient(90deg, 
+    rgba(0, 0, 0, 0.06) 25%, 
+    rgba(0, 0, 0, 0.10) 37%, 
+    rgba(0, 0, 0, 0.06) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: 8px;
+}
+
+:is(.dark) .skeleton {
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.06) 25%, 
+    rgba(255, 255, 255, 0.12) 37%, 
+    rgba(255, 255, 255, 0.06) 63%
+  );
+  background-size: 400% 100%;
+}
+
+/* ========================================
+   ONLINE STATUS PULSE
+   ======================================== */
+
+.online-pulse {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* ========================================
+   CUSTOM SCROLLBAR
+   ======================================== */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+:is(.dark) ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:is(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ========================================
+   NAVBAR SCROLL EFFECT
+   ======================================== */
+
+.navbar-scrolled {
+  @apply shadow-lg dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)];
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* ========================================
+   TOOLTIP
+   ======================================== */
+
+.tooltip-container {
+  position: relative;
+}
+
+.tooltip-container .tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  transition: opacity 0.2s, visibility 0.2s;
+  pointer-events: none;
+  @apply bg-gray-900 text-white dark:bg-white dark:text-gray-900;
+  margin-bottom: 4px;
+}
+
+.tooltip-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
 }

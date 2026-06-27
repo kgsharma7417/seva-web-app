@@ -61,21 +61,21 @@ export function AuthProvider({ children }) {
   }
 
   // Log in with Email & Password
-  async function login(email, password, isWorker = false) {
+  async function login(email, password, role = 'customer') {
     const result = await signInWithEmailAndPassword(auth, email, password);
     
-    // For demo purposes, if they explicitly choose "Worker" during login, update their role to worker
-    if (isWorker) {
+    // For demo purposes, update role explicitly if selected
+    if (role === 'worker' || role === 'admin') {
       const userRef = doc(db, 'users', result.user.uid);
-      await setDoc(userRef, { role: 'worker' }, { merge: true });
-      setUserRole('worker');
+      await setDoc(userRef, { role: role }, { merge: true });
+      setUserRole(role);
     }
     
     return result;
   }
 
   // Google Login
-  async function loginWithGoogle(isWorker = false) {
+  async function loginWithGoogle(role = 'customer') {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
     
@@ -84,7 +84,6 @@ export function AuthProvider({ children }) {
     
     if (!userDoc.exists()) {
       // If new user, create their document
-      const role = isWorker ? 'worker' : 'customer';
       await setDoc(doc(db, 'users', user.uid), {
         name: user.displayName,
         email: user.email,
@@ -95,10 +94,10 @@ export function AuthProvider({ children }) {
       setUserRole(role);
     } else {
       // If existing user, load their role
-      // For demo purposes, allow upgrading to worker if selected
-      if (isWorker && userDoc.data().role !== 'worker') {
-         await setDoc(doc(db, 'users', user.uid), { role: 'worker' }, { merge: true });
-         setUserRole('worker');
+      // For demo purposes, allow upgrading to worker/admin if selected
+      if ((role === 'worker' || role === 'admin') && userDoc.data().role !== role) {
+         await setDoc(doc(db, 'users', user.uid), { role: role }, { merge: true });
+         setUserRole(role);
       } else {
          setUserRole(userDoc.data().role);
       }

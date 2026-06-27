@@ -101,7 +101,7 @@ const Hero = () => {
         <input 
           type="text" 
           placeholder={t('search_placeholder')} 
-          className="w-full bg-white dark:bg-[#0A132D] border border-gray-200 dark:border-white/10 rounded-2xl py-5 pl-12 pr-40 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#3B82F6]/50 focus:ring-4 focus:ring-[#3B82F6]/10 transition-all shadow-lg dark:shadow-none"
+          className="w-full bg-white dark:bg-[#0A132D] border border-gray-200 dark:border-white/10 rounded-2xl py-4 md:py-5 pl-12 pr-28 md:pr-40 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#3B82F6]/50 focus:ring-4 focus:ring-[#3B82F6]/10 transition-all shadow-lg dark:shadow-none"
         />
         <div className="absolute inset-y-0 right-2 flex items-center space-x-2">
           
@@ -147,7 +147,7 @@ const Hero = () => {
             )}
           </div>
 
-          <button onClick={() => navigate('/listing')} className="bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white px-6 py-3 rounded-xl hover:scale-105 transition-transform shadow-lg shadow-[#3B82F6]/25 flex items-center font-bold">
+          <button onClick={() => navigate('/listing')} className="bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white px-4 py-2 md:px-6 md:py-3 text-sm md:text-base rounded-xl hover:scale-105 transition-transform shadow-lg shadow-[#3B82F6]/25 flex items-center font-bold">
             {t('search_btn')}
           </button>
         </div>

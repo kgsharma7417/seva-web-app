@@ -9,7 +9,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [isWorker, setIsWorker] = useState(false);
+  const [roleMode, setRoleMode] = useState('customer'); // 'customer', 'worker', 'admin'
   const [workerService, setWorkerService] = useState('ac-repair');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,7 +22,9 @@ export default function AuthPage() {
     // Only auto-redirect if user visits /auth while already logged in
     // and not actively submitting a form
     if (currentUser && userRole && !loading) {
-      if (userRole === 'worker') {
+      if (userRole === 'admin') {
+        navigate('/admin');
+      } else if (userRole === 'worker') {
         navigate('/worker-dashboard');
       } else {
         navigate('/dashboard');
@@ -37,11 +39,12 @@ export default function AuthPage() {
 
     try {
       if (isLogin) {
-        await login(email, password, isWorker);
-        navigate(isWorker ? '/worker-dashboard' : '/dashboard');
+        await login(email, password, roleMode);
+        if (roleMode === 'admin') navigate('/admin');
+        else navigate(roleMode === 'worker' ? '/worker-dashboard' : '/dashboard');
       } else {
-        await signup(email, password, name, isWorker, workerService);
-        navigate(isWorker ? '/worker-dashboard' : '/dashboard');
+        await signup(email, password, name, roleMode === 'worker', workerService);
+        navigate(roleMode === 'worker' ? '/worker-dashboard' : '/dashboard');
       }
     } catch (err) {
       setError(err.message || 'Failed to authenticate');
@@ -53,8 +56,9 @@ export default function AuthPage() {
     try {
       setError('');
       setLoading(true);
-      await loginWithGoogle(isWorker);
-      navigate(isWorker ? '/worker-dashboard' : '/dashboard');
+      await loginWithGoogle(roleMode);
+      if (roleMode === 'admin') navigate('/admin');
+      else navigate(roleMode === 'worker' ? '/worker-dashboard' : '/dashboard');
     } catch (err) {
       setError(err.message || 'Failed to authenticate with Google');
     }
@@ -89,23 +93,29 @@ export default function AuthPage() {
           {/* User Type Toggle */}
           <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-xl mb-6">
             <button
-              onClick={() => setIsWorker(false)}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${!isWorker ? 'bg-white dark:bg-[#3B82F6] text-[#3B82F6] dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+              onClick={() => setRoleMode('customer')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${roleMode === 'customer' ? 'bg-white dark:bg-[#3B82F6] text-[#3B82F6] dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
             >
               Customer
             </button>
             <button
-              onClick={() => setIsWorker(true)}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${isWorker ? 'bg-white dark:bg-[#10B981] text-[#10B981] dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+              onClick={() => setRoleMode('worker')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${roleMode === 'worker' ? 'bg-white dark:bg-[#10B981] text-[#10B981] dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
             >
               Worker
+            </button>
+            <button
+              onClick={() => { setRoleMode('admin'); setIsLogin(true); }}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${roleMode === 'admin' ? 'bg-white dark:bg-[#8B5CF6] text-[#8B5CF6] dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            >
+              Admin
             </button>
           </div>
 
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
             {isLogin 
-              ? (isWorker ? 'Worker Login' : t('auth_welcome')) 
-              : (isWorker ? 'Register as Worker' : t('auth_create'))}
+              ? (roleMode === 'admin' ? 'Admin Login' : roleMode === 'worker' ? 'Worker Login' : t('auth_welcome')) 
+              : (roleMode === 'worker' ? 'Register as Worker' : t('auth_create'))}
           </h2>
 
           {error && (
@@ -133,7 +143,7 @@ export default function AuthPage() {
               </div>
             )}
 
-            {!isLogin && isWorker && (
+            {!isLogin && roleMode === 'worker' && (
               <div>
                 <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Your Service Area</label>
                 <div className="relative">
@@ -225,15 +235,17 @@ export default function AuthPage() {
             {t('auth_guest')}
           </button>
 
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-            {isLogin ? t('auth_no_account') + " " : t('auth_has_account') + " "}
-            <button 
-              onClick={() => { setIsLogin(!isLogin); setError(''); }}
-              className="text-[#3B82F6] hover:text-blue-700 dark:hover:text-white font-medium transition-colors"
-            >
-              {isLogin ? t('auth_signup_link') : t('auth_login_link')}
-            </button>
-          </p>
+          {roleMode !== 'admin' && (
+            <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+              {isLogin ? t('auth_no_account') + " " : t('auth_has_account') + " "}
+              <button 
+                onClick={() => { setIsLogin(!isLogin); setError(''); }}
+                className="text-[#3B82F6] hover:text-blue-700 dark:hover:text-white font-medium transition-colors"
+              >
+                {isLogin ? t('auth_signup_link') : t('auth_login_link')}
+              </button>
+            </p>
+          )}
         </div>
       </div>
     </div>

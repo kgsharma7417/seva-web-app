@@ -7,6 +7,7 @@ import EditProfileModal from '../components/profile/EditProfileModal';
 import IDCardModal from '../components/profile/IDCardModal';
 import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import app from '../firebase';
+import LiveTracking from '../components/common/LiveTracking';
 
 // ============================================================================
 // TYPES
@@ -20,13 +21,7 @@ import app from '../firebase';
 
 
 
-const mockTransactions = [
-  { id: 'T001', type: 'debit', title: 'AC Repair - Ramesh Kumar', description: 'Active booking', amount: 599, date: '15 Mar 2024', bookingId: 'B001' },
-  { id: 'T002', type: 'debit', title: 'Plumbing - Suresh', description: 'Completed', amount: 499, date: '10 Mar 2024', bookingId: 'B002' },
-  { id: 'T003', type: 'credit', title: 'Referral Bonus', description: 'Friend booking', amount: 100, date: '8 Mar 2024' },
-  { id: 'T004', type: 'debit', title: 'Electrical - Arjun', description: 'Completed', amount: 559, date: '5 Mar 2024', bookingId: 'B003' },
-  { id: 'T005', type: 'refund', title: 'Cancellation Refund', description: 'Booking cancelled', amount: 299, date: '1 Mar 2024' },
-];
+// Using dynamic data from Firebase for all operations
 
 export default function UserDashboard() {
   const navigate = useNavigate();
@@ -80,7 +75,13 @@ export default function UserDashboard() {
     }
   };
 
-  // Fallback profile if userData is still loading or incomplete
+  const activeBookings = myBookings.filter(b => b.status === 'active' || b.status === 'pending' || b.status === 'accepted');
+  const completedBookings = myBookings.filter(b => b.status === 'completed');
+  const totalSpent = myBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+  const walletBalance = userData?.walletBalance || 0;
+  const transactions = userData?.transactions || [];
+
+  // Profile data without mocks
   const profile = {
     name: userData?.name || currentUser?.displayName || 'User',
     phone: userData?.phone || 'Not provided',
@@ -89,16 +90,9 @@ export default function UserDashboard() {
     area: userData?.area || 'Taj Ganj',
     avatar: userData?.avatar || (userData?.name ? userData.name.substring(0, 2).toUpperCase() : 'U'),
     memberSince: userData?.createdAt ? new Date(userData.createdAt.seconds * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Recently',
-    totalBookings: 12, // Mocked for now
-    averageRating: 4.6, // Mocked for now
+    totalBookings: completedBookings.length,
+    averageRating: userData?.rating || 0,
   };
-
-  const activeBookings = myBookings.filter(b => b.status === 'active' || b.status === 'pending' || b.status === 'accepted');
-  const completedBookings = myBookings.filter(b => b.status === 'completed');
-  const totalSpent = myBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
-  const walletBalance = userData?.walletBalance || 0;
-  const transactions = userData?.transactions || mockTransactions;
-  const unreadNotifications = 3;
 
   const { updateUserProfile } = useAuth();
   
@@ -256,6 +250,16 @@ export default function UserDashboard() {
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Live Tracking Map for Active Bookings */}
+                  {(booking.status === 'pending' || booking.status === 'accepted') && (
+                    <div className="mt-8 border-t border-gray-100 dark:border-white/5 pt-6 relative z-10">
+                      <h4 className="font-syne font-bold text-lg mb-4 flex items-center gap-2">
+                        <MapPinIcon className="w-5 h-5 text-[#10B981]" /> Live Tracking
+                      </h4>
+                      <LiveTracking booking={booking} userLocation={userData?.location} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -380,7 +384,19 @@ export default function UserDashboard() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3 pt-6 border-t border-gray-100 dark:border-white/5">
+              {/* Live Tracking in Bookings Tab */}
+              {(booking.status === 'pending' || booking.status === 'accepted') && (
+                <div className="px-6 md:px-8 pb-6">
+                  <div className="mt-2 border-t border-gray-100 dark:border-white/5 pt-6">
+                    <h4 className="font-syne font-bold text-lg mb-4 flex items-center gap-2">
+                      <MapPinIcon className="w-5 h-5 text-[#10B981]" /> Live Worker Tracking
+                    </h4>
+                    <LiveTracking booking={booking} userLocation={userData?.location} />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-3 pt-6 border-t border-gray-100 dark:border-white/5 px-6 pb-6 md:px-8 md:pb-8">
                 {(booking.status === 'pending' || booking.status === 'accepted') && (
                   <>
                     <button 

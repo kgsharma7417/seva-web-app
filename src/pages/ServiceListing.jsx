@@ -1,14 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star, MapPin, Clock, Heart, MessageCircle, Search, Filter, Zap, Wrench, Droplets, Sparkles, ChevronLeft, Navigation } from 'lucide-react';
+import { Star, MapPin, Clock, Heart, MessageCircle, Search, Filter, Zap, Wrench, Droplets, Sparkles, ChevronLeft, Navigation, Map as MapIcon, List, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useLocation } from '../context/LocationContext';
 import { getFirestore, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import app from '../firebase';
+import WorkerMapView from '../components/common/WorkerMapView';
 
 // Helper function to calculate distance using Haversine formula
 function getDistanceInKm(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Radius of the earth in km
+  const R = 6371;
   const dLat = (lat2 - lat1) * (Math.PI/180);
   const dLon = (lon2 - lon1) * (Math.PI/180); 
   const a = 
@@ -19,8 +20,6 @@ function getDistanceInKm(lat1, lon1, lat2, lon2) {
   return R * c; 
 }
 
-// mockWorkers removed in favor of real Firebase data
-const AREAS = ['All Areas', 'Agra City', 'Taj Ganj', 'Sadar Bazar', 'Civil Lines', 'Fatehpur Sikri Road', 'Shilpgram'];
 const PRICE_RANGES = [
   { label: 'Under ₹250', min: 0, max: 250 },
   { label: '₹250 - ₹350', min: 250, max: 350 },
@@ -40,6 +39,9 @@ export default function ServiceListing() {
   const [favorites, setFavorites] = useState(new Set());
   const [workers, setWorkers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('list');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [loading, setLoading] = useState(true);
   const db = getFirestore(app);
 
   React.useEffect(() => {
@@ -51,13 +53,14 @@ export default function ServiceListing() {
           id: doc.id,
           name: data.name || 'Unknown Worker',
           service: data.service || 'ac-repair',
-          specialty: data.specialty || 'General Service',
-          rating: data.rating || 5.0,
+          services: data.services || [],
+          specialty: data.specialty || '',
+          rating: data.rating || 0,
           reviews: data.reviews || 0,
-          experience: data.experience || '1 yr',
-          hourlyRate: data.hourlyRate || 250,
-          responseTime: `~${data.responseTimeMinutes || 15} min`,
-          responseTimeMinutes: data.responseTimeMinutes || 15,
+          experience: data.experience || '',
+          hourlyRate: data.hourlyRate || 0,
+          responseTime: data.responseTimeMinutes ? `~${data.responseTimeMinutes} min` : 'N/A',
+          responseTimeMinutes: data.responseTimeMinutes || 999,
           verified: data.verified !== false,
           image: data.name ? data.name.substring(0, 2).toUpperCase() : 'W',
           area: data.area || 'Agra City',
@@ -66,6 +69,7 @@ export default function ServiceListing() {
         };
       });
       setWorkers(fetchedWorkers);
+      setLoading(false);
     });
     return () => unsubscribe();
   }, [db]);
@@ -79,7 +83,6 @@ export default function ServiceListing() {
     { id: 'painting', name: t('cat_painting'), icon: Sparkles, count: workers.filter(w => w.service === 'painting').length },
   ];
 
-  // Extract all unique skills from available workers
   const availableSkills = useMemo(() => {
     const skillsSet = new Set();
     workers.forEach(w => {
@@ -90,7 +93,6 @@ export default function ServiceListing() {
     return Array.from(skillsSet).sort();
   }, [workers]);
 
-  // Extract all unique areas from available workers dynamically
   const DYNAMIC_AREAS = useMemo(() => {
     const areasSet = new Set(['All Areas']);
     workers.forEach(w => {
@@ -107,7 +109,6 @@ export default function ServiceListing() {
 
   const filteredWorkers = useMemo(() => {
     let filtered = workers.map(w => {
-      // Calculate distance to this worker
       const userCoords = userLocation?.coordinates;
       let dist = 0;
       if (userCoords && w.coordinates) {
@@ -116,7 +117,12 @@ export default function ServiceListing() {
       return { ...w, distanceKm: dist };
     });
 
-    if (selectedService) filtered = filtered.filter(w => w.service === selectedService);
+    if (selectedService) {
+      filtered = filtered.filter(w => 
+        (w.services && w.services.includes(selectedService)) || 
+        w.service === selectedService
+      );
+    }
     if (selectedArea !== 'All Areas') filtered = filtered.filter(w => w.area === selectedArea);
     filtered = filtered.filter(w => w.hourlyRate >= priceRange.min && w.hourlyRate <= priceRange.max);
     
@@ -125,11 +131,11 @@ export default function ServiceListing() {
       filtered = filtered.filter(w => 
         (w.name && w.name.toLowerCase().includes(q)) ||
         (w.service && w.service.toLowerCase().includes(q)) ||
+        (w.services && w.services.some(s => s.toLowerCase().includes(q))) ||
         (w.specialty && w.specialty.toLowerCase().includes(q))
       );
     }
     
-    // Filter by selected skills (OR logic: worker must have at least one selected skill)
     if (selectedSkills.length > 0) {
       filtered = filtered.filter(w => {
         if (!w.skills || !Array.isArray(w.skills)) return false;
@@ -173,7 +179,6 @@ export default function ServiceListing() {
             </button>
           </div>
 
-          {/* Search & Filter Bar */}
           <div className="flex gap-3 flex-wrap items-center">
             <div className="flex-1 min-w-[240px] relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-[#3B82F6] transition-colors" />
@@ -186,9 +191,19 @@ export default function ServiceListing() {
               />
             </div>
             <div className="flex gap-2">
-              <button className="flex items-center gap-2 px-4 py-3 glass-card rounded-xl hover:bg-gray-50 dark:hover:bg-white/10 transition-all text-sm text-gray-600 dark:text-gray-300">
+              <button 
+                onClick={() => setShowMobileFilters(true)}
+                className="lg:hidden flex items-center gap-2 px-4 py-3 glass-card rounded-xl hover:bg-gray-50 dark:hover:bg-white/10 transition-all text-sm text-gray-600 dark:text-gray-300"
+              >
                 <Filter className="w-4 h-4" />
                 {t('sl_filters')}
+              </button>
+              <button 
+                onClick={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
+                className="flex items-center gap-2 px-4 py-3 glass-card rounded-xl hover:bg-gray-50 dark:hover:bg-white/10 transition-all text-sm text-gray-600 dark:text-gray-300"
+              >
+                {viewMode === 'list' ? <MapIcon className="w-4 h-4" /> : <List className="w-4 h-4" />}
+                {viewMode === 'list' ? 'Map' : 'List'}
               </button>
             </div>
           </div>
@@ -199,8 +214,14 @@ export default function ServiceListing() {
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           
           {/* Left Sidebar (Filters) */}
-          <div className="w-full lg:w-64 flex-shrink-0 space-y-6">
-            <div className="sticky top-40 space-y-8">
+          <div className={`w-full lg:w-64 flex-shrink-0 space-y-6 ${showMobileFilters ? 'fixed inset-0 z-50 bg-white dark:bg-[#060D1F] p-4 overflow-y-auto' : 'hidden lg:block'}`}>
+            <div className="lg:hidden flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-white/10">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Filters</h2>
+              <button onClick={() => setShowMobileFilters(false)} className="p-2 bg-gray-100 dark:bg-white/10 rounded-full text-gray-600 dark:text-gray-300">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="lg:sticky lg:top-40 space-y-8">
               {/* Service Filter */}
               <div>
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">Service Type</h3>
@@ -321,109 +342,160 @@ export default function ServiceListing() {
             </div>
           </div>
 
-          {/* Results List */}
+          {/* Results Area */}
           <div className="flex-1 w-full">
-            <div className="mb-6 flex items-center justify-between">
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
-                Showing <span className="font-semibold text-gray-900 dark:text-white">{filteredWorkers.length}</span> {t('nav_workers')}
-                {selectedService && ` for ${SERVICES.find(s => s.id === selectedService)?.name}`}
-              </p>
-            </div>
+            {viewMode === 'map' ? (
+              <WorkerMapView 
+                workers={filteredWorkers} 
+                userLocation={userLocation}
+                onWorkerClick={(workerId) => navigate(`/worker/${workerId}`)}
+              />
+            ) : (
+              <>
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-syne font-bold text-gray-900 dark:text-white">
+                    {loading ? 'Finding experts...' : `${filteredWorkers.length} Experts Available`}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Sort by:</span>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2"
+                    >
+                      <option value="distance">Nearest First</option>
+                      <option value="rating">Top Rated</option>
+                      <option value="response">Fastest Response</option>
+                      <option value="price">Lowest Price</option>
+                    </select>
+                  </div>
+                </div>
 
-            <div className="space-y-4">
-              {filteredWorkers.map((worker, i) => (
-                <div
-                  key={worker.id}
-                  className="glass-card rounded-2xl p-6 hover:border-[#3B82F6]/50 dark:hover:border-[#3B82F6]/50 transition-all group animate-fade-up"
-                  style={{ animationDelay: `${i * 100}ms` }}
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-6">
-                    {/* Avatar & Info */}
-                    <div className="flex gap-4 sm:col-span-1">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#3B82F6] to-[#06B6D4] flex items-center justify-center flex-shrink-0 font-bold text-white text-lg shadow-lg">
-                        {worker.image}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-syne font-bold text-lg text-gray-900 dark:text-white truncate">{worker.name}</h4>
-                          {worker.verified && (
-                            <div className="px-2 py-0.5 bg-[#10B981]/10 border border-[#10B981]/20 rounded text-[10px] text-[#10B981] flex-shrink-0 font-medium">
-                              Verified
+                {loading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="glass-card rounded-2xl p-6 animate-pulse">
+                        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-6">
+                          <div className="flex gap-4 sm:col-span-1">
+                            <div className="w-16 h-16 rounded-2xl bg-gray-200 dark:bg-gray-800"></div>
+                            <div className="flex-1 space-y-3 min-w-[200px]">
+                              <div className="h-5 bg-gray-200 dark:bg-gray-800 rounded w-3/4"></div>
+                              <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2"></div>
+                              <div className="flex gap-2">
+                                <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-20"></div>
+                                <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-24"></div>
+                              </div>
                             </div>
-                          )}
-                        </div>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">{worker.specialty} • {worker.experience}</p>
-                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                          <span className="flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-[#06B6D4]" />
-                            {worker.area}
-                          </span>
-                          <span className="flex items-center gap-1.5 bg-[#06B6D4]/10 text-[#06B6D4] px-2 py-0.5 rounded-full font-medium">
-                            <Navigation className="w-3 h-3" />
-                            {worker.distanceKm.toFixed(1)} km away
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-2">
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-[#3B82F6]" />
-                            {worker.responseTime}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-[#3B82F6]" />
-                            {worker.responseTime}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Rating & Action */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 justify-between sm:col-span-2">
-                      <div className="flex items-center gap-2">
-                        <div className="text-right flex flex-col items-end">
-                          <div className="flex items-center gap-1 mb-1">
-                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                            <span className="font-semibold text-gray-900 dark:text-white">{worker.rating}</span>
                           </div>
-                          <p className="text-gray-500 text-xs">({worker.reviews} reviews)</p>
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 justify-between sm:col-span-2">
+                             <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-24"></div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-white/5">
+                           <div className="h-12 bg-gray-200 dark:bg-gray-800 rounded-xl"></div>
+                           <div className="h-12 bg-gray-200 dark:bg-gray-800 rounded-xl"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredWorkers.map((worker, i) => (
+                    <div
+                      key={worker.id}
+                      className="glass-card rounded-2xl p-6 hover:border-[#3B82F6]/50 dark:hover:border-[#3B82F6]/50 transition-all group animate-fade-up"
+                      style={{ animationDelay: `${i * 100}ms` }}
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-6">
+                        <div className="flex gap-4 sm:col-span-1">
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#3B82F6] to-[#06B6D4] flex items-center justify-center flex-shrink-0 font-bold text-white text-lg shadow-lg">
+                            {worker.image}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-syne font-bold text-lg text-gray-900 dark:text-white truncate">{worker.name}</h4>
+                              {worker.verified && (
+                                <div className="px-2 py-0.5 bg-[#10B981]/10 border border-[#10B981]/20 rounded text-[10px] text-[#10B981] flex-shrink-0 font-medium">
+                                  Verified
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">{worker.specialty} • {worker.experience}</p>
+                            <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
+                              <span className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-[#06B6D4]" />
+                                {worker.area}
+                              </span>
+                              <span className="flex items-center gap-1.5 bg-[#06B6D4]/10 text-[#06B6D4] px-2 py-0.5 rounded-full font-medium">
+                                <Navigation className="w-3 h-3" />
+                                {worker.distanceKm.toFixed(1)} km away
+                              </span>
+                              {worker.isOnline && (
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-[#10B981] online-pulse"></span>
+                                  <span className="text-[#10B981] font-medium">Online</span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                              <span className="flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                {worker.responseTime}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 justify-between sm:col-span-2">
+                          <div className="flex items-center gap-2">
+                            <div className="text-right flex flex-col items-end">
+                              <div className="flex items-center gap-1 mb-1">
+                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                <span className="font-semibold text-gray-900 dark:text-white">{worker.rating}</span>
+                              </div>
+                              <p className="text-gray-500 text-xs">({worker.reviews} reviews)</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <div className="text-right flex-1 sm:flex-none">
+                              <p className="font-bold text-[#06B6D4] text-lg">₹{worker.hourlyRate}</p>
+                              <p className="text-gray-500 text-xs">per hour</p>
+                            </div>
+                            <button
+                              onClick={() => toggleFavorite(worker.id)}
+                              className="p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:bg-[#3B82F6]/10 dark:hover:bg-[#3B82F6]/10 hover:border-[#3B82F6]/30 transition-all"
+                            >
+                              <Heart
+                                className={`w-5 h-5 transition-colors ${favorites.has(worker.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
+                              />
+                            </button>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 w-full sm:w-auto">
-                        <div className="text-right flex-1 sm:flex-none">
-                          <p className="font-bold text-[#06B6D4] text-lg">₹{worker.hourlyRate}</p>
-                          <p className="text-gray-500 text-xs">per hour</p>
-                        </div>
-                        <button
-                          onClick={() => toggleFavorite(worker.id)}
-                          className="p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:bg-[#3B82F6]/10 dark:hover:bg-[#3B82F6]/10 hover:border-[#3B82F6]/30 transition-all"
-                        >
-                          <Heart
-                            className={`w-5 h-5 transition-colors ${favorites.has(worker.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
-                          />
+                      <div className="grid grid-cols-2 gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-white/5">
+                        <button className="px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-sm font-medium flex items-center justify-center gap-2">
+                          <MessageCircle className="w-4 h-4 text-[#3B82F6]" />
+                          Message
+                        </button>
+                        <button onClick={() => navigate(`/worker/${worker.id}`)} className="flex-1 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white py-3 rounded-xl font-bold hover:scale-[1.02] transition-transform shadow-lg shadow-[#3B82F6]/20">
+                          {t('workers_book_btn')}
                         </button>
                       </div>
                     </div>
+                  ))}
                   </div>
-
-                  {/* CTAs */}
-                  <div className="grid grid-cols-2 gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-white/5">
-                    <button className="px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-sm font-medium flex items-center justify-center gap-2">
-                      <MessageCircle className="w-4 h-4 text-[#3B82F6]" />
-                      Message
-                    </button>
-                    <button onClick={() => navigate(`/worker/${worker.id}`)} className="flex-1 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white py-3 rounded-xl font-bold hover:scale-[1.02] transition-transform shadow-lg shadow-[#3B82F6]/20">
-                      {t('workers_book_btn')}
-                    </button>
+                )}
+                
+                {!loading && filteredWorkers.length === 0 && (
+                  <div className="text-center py-16 glass-card rounded-2xl border-transparent">
+                    <div className="text-5xl mb-4">🔍</div>
+                    <p className="text-gray-900 dark:text-gray-300 font-medium mb-2">No workers found matching your criteria</p>
+                    <p className="text-sm text-gray-500">Try adjusting your filters or area</p>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {filteredWorkers.length === 0 && (
-              <div className="text-center py-16 glass-card rounded-2xl border-transparent">
-                <p className="text-gray-900 dark:text-gray-300 font-medium mb-2">No workers found matching your criteria</p>
-                <p className="text-sm text-gray-500">Try adjusting your filters or area</p>
-              </div>
+                )}
+              </>
             )}
           </div>
         </div>

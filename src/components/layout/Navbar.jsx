@@ -1,19 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { LogOut, User, Sun, Moon, Globe } from 'lucide-react';
+import { LogOut, User, Sun, Moon, Globe, Menu, X } from 'lucide-react';
 
 const Navbar = () => {
   const navigate = useNavigate();
   const { currentUser, userRole, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { lang, setLang, t } = useLanguage();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <nav className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto animate-fade-up">
-      <button onClick={() => navigate('/')} className="text-2xl font-syne font-bold tracking-tight text-gray-900 dark:text-white hover:opacity-80 transition-opacity focus:outline-none">
+    <nav className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-6 max-w-7xl mx-auto animate-fade-up relative">
+      <button onClick={() => navigate('/')} className="text-xl sm:text-2xl font-syne font-bold tracking-tight text-gray-900 dark:text-white hover:opacity-80 transition-opacity focus:outline-none">
         Seva<span className="text-[#06B6D4]">.</span>
       </button>
       
@@ -71,10 +72,33 @@ const Navbar = () => {
             {t('nav_login')}
           </button>
         )}
-        <button onClick={() => navigate('/listing')} className="text-sm font-medium text-white bg-[#3B82F6] hover:bg-[#2563EB] dark:bg-white/5 dark:border dark:border-white/10 dark:hover:bg-white/10 transition-all rounded-lg px-5 py-2.5 hover:scale-105">
+        <button onClick={() => navigate('/listing')} className="hidden sm:block text-sm font-medium text-white bg-[#3B82F6] hover:bg-[#2563EB] dark:bg-white/5 dark:border dark:border-white/10 dark:hover:bg-white/10 transition-all rounded-lg px-5 py-2.5 hover:scale-105">
           {t('nav_book')}
         </button>
+        {/* Mobile Menu Toggle */}
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+          className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10 transition-colors"
+        >
+          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
       </div>
+
+      {/* Mobile Navigation Menu */}
+      {isMobileMenuOpen && (
+        <div className="absolute top-full left-0 w-full bg-white dark:bg-[#060D1F] border-b border-gray-200 dark:border-white/10 shadow-lg md:hidden z-40 animate-fade-down">
+          <div className="px-4 pt-2 pb-6 space-y-2 flex flex-col">
+            <a href="#" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-white/5">Services</a>
+            <a href="#" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-white/5">Cities</a>
+            <a href="#" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-white/5">Workers</a>
+            <a href="#" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-white/5">About</a>
+            
+            <button onClick={() => { setIsMobileMenuOpen(false); navigate('/listing'); }} className="mt-4 w-full text-center text-sm font-medium text-white bg-[#3B82F6] rounded-xl px-5 py-3 shadow-lg">
+              {t('nav_book')}
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

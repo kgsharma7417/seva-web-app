@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, IdCard, Gavel, CalendarCheck, BarChart3, Users, 
   Ban, BellRing, Star, Filter, FileText, Award, Camera, 
-  Download, Plus, Send, X, Check, Bell
+  Download, Plus, Send, X, Check, Bell, LogOut
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { getFirestore, collection, query, onSnapshot, doc, updateDoc, where } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
+import { getFirestore, collection, query, onSnapshot, doc, updateDoc, where, addDoc } from 'firebase/firestore';
 import app from '../firebase';
 
 export default function AdminDashboard() {
@@ -15,6 +16,17 @@ export default function AdminDashboard() {
   const [suspendUser, setSuspendUser] = useState('');
   const [notifForm, setNotifForm] = useState({ title: '', body: '' });
   const { t } = useLanguage();
+  const { logout } = useAuth();
+  
+  const handleLogout = async () => {
+    try {
+      await logout();
+      window.location.href = '/';
+    } catch (e) {
+      console.error(e);
+      showToast("Failed to log out");
+    }
+  };
 
   // Show toast helper
   const showToast = (msg) => {
@@ -83,6 +95,42 @@ export default function AdminDashboard() {
     } catch (e) {
       console.error(e);
       showToast("Error updating user status");
+    }
+  };
+
+  const handleSendNotification = async () => {
+    if (!notifForm.title || !notifForm.body) {
+      showToast('Title and message are required.');
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        title: notifForm.title,
+        body: notifForm.body,
+        createdAt: new Date()
+      });
+      showToast('Notification sent to all users!');
+      setNotifForm({ title: '', body: '' });
+    } catch (e) {
+      showToast('Error sending notification');
+    }
+  };
+
+  const handleCancelBooking = async (bookingId) => {
+    try {
+      await updateDoc(doc(db, 'bookings', bookingId), { status: 'cancelled' });
+      showToast(`Booking cancelled`);
+    } catch (e) {
+      showToast('Error cancelling booking');
+    }
+  };
+
+  const handleResolveDispute = async (bookingId) => {
+    try {
+      await updateDoc(doc(db, 'bookings', bookingId), { hasDispute: false, status: 'completed' });
+      showToast('Dispute resolved');
+    } catch (e) {
+      showToast('Error resolving dispute');
     }
   };
 
@@ -191,42 +239,38 @@ export default function AdminDashboard() {
       </div>
 
       <div className="space-y-4">
-        {[
-          { id: '1042', time: '1d ago', stake: '₹1,200', cName: 'Amit Verma', cClaim: 'Work not completed', wName: 'Raju Singh', wClaim: 'Work done, photos shared', desc: 'Customer claims electrician left mid-job. Worker submitted 4 photos as evidence. Booking #BK-8821.' },
-          { id: '1038', time: '2d ago', stake: '₹2,500', cName: 'Sunita Rao', cClaim: 'Wrong person arrived', wName: 'Deepak Jha', wClaim: 'Sent verified sub', desc: 'Customer expected the booked worker but a substitute arrived without prior notice. Policy violation may apply.' }
-        ].map((d, i) => (
-          <div key={i} className="glass-card rounded-2xl p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 px-4 py-1.5 bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 text-xs font-bold rounded-bl-xl border-b border-l border-yellow-200 dark:border-yellow-500/20">
-              Open
+        {allBookings.filter(b => b.hasDispute).length === 0 ? (
+          <div className="text-center py-10 glass-card rounded-2xl w-full">
+            <p className="text-gray-500">No active disputes.</p>
+          </div>
+        ) : allBookings.filter(b => b.hasDispute).map((d) => (
+          <div key={d.id} className="glass-card rounded-2xl p-6 relative overflow-hidden border-red-500/20 border">
+            <div className="absolute top-0 right-0 px-4 py-1.5 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 text-xs font-bold rounded-bl-xl border-b border-l border-red-200 dark:border-red-500/20">
+              Disputed
             </div>
             <div className="flex justify-between items-start mb-4">
               <div>
-                <p className="text-sm font-bold text-gray-900 dark:text-white">#DIS-{d.id}</p>
-                <p className="text-xs text-gray-500">Opened {d.time}</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">#BK-{d.id.slice(-6).toUpperCase()}</p>
+                <p className="text-xs text-gray-500">Service: {d.service}</p>
               </div>
-              <span className="text-[#3B82F6] font-bold text-sm mr-16">{d.stake} at stake</span>
+              <span className="text-red-500 font-bold text-sm mr-16">₹{d.totalAmount} at stake</span>
             </div>
             
-            <div className="flex flex-col md:flex-row gap-4 items-center mb-4">
-              <div className="flex-1 glass-card rounded-xl p-4 w-full">
+            <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
+              <div className="flex-1 glass-card rounded-xl p-4 w-full border border-gray-100 dark:border-white/5">
                 <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1">Customer</p>
-                <p className="text-sm font-bold text-gray-900 dark:text-white">{d.cName}</p>
-                <p className="text-xs text-red-500 dark:text-red-400 mt-1">Claim: {d.cClaim}</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{d.customerName || 'Unknown'}</p>
               </div>
               <div className="text-gray-400 dark:text-gray-600 font-syne font-bold italic">VS</div>
-              <div className="flex-1 glass-card rounded-xl p-4 w-full">
+              <div className="flex-1 glass-card rounded-xl p-4 w-full border border-gray-100 dark:border-white/5">
                 <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1">Worker</p>
-                <p className="text-sm font-bold text-gray-900 dark:text-white">{d.wName}</p>
-                <p className="text-xs text-[#10B981] mt-1">Claim: {d.wClaim}</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{d.workerName || 'Unknown'}</p>
               </div>
             </div>
-
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">{d.desc}</p>
             
             <div className="flex flex-wrap gap-3">
-              <button onClick={() => showToast('Resolved — refund issued')} className="px-4 py-2 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-lg text-sm font-medium transition-all">Refund Customer</button>
-              <button onClick={() => showToast('Resolved — payment released')} className="px-4 py-2 bg-[#3B82F6]/10 text-[#3B82F6] border border-[#3B82F6]/20 hover:bg-[#3B82F6] hover:text-white rounded-lg text-sm font-medium transition-all">Release to Worker</button>
-              <button className="px-4 py-2 glass-card text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg text-sm font-medium transition-all">View Evidence</button>
+              <button onClick={() => handleCancelBooking(d.id)} className="px-4 py-2 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-lg text-sm font-medium transition-all">Cancel Booking</button>
+              <button onClick={() => handleResolveDispute(d.id)} className="px-4 py-2 bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20 hover:bg-[#10B981] hover:text-white rounded-lg text-sm font-medium transition-all">Force Resolve</button>
             </div>
           </div>
         ))}
@@ -256,23 +300,30 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody className="text-sm">
-              {[
-                { id: '8831', c: 'Neha Gupta', w: 'Ravi Agarwal', s: 'Electrical', amt: '₹850', stat: 'Completed', color: 'text-[#10B981] bg-[#10B981]/10 border-[#10B981]/20' },
-                { id: '8829', c: 'Rohit Mehra', w: 'Priya Sharma', s: 'Plumbing', amt: '₹1,200', stat: 'Ongoing', color: 'text-[#3B82F6] bg-[#3B82F6]/10 border-[#3B82F6]/20' },
-                { id: '8821', c: 'Amit Verma', w: 'Raju Singh', s: 'Electrical', amt: '₹1,200', stat: 'Dispute', color: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20' },
-                { id: '8818', c: 'Kavya Nair', w: 'Mohit Kumar', s: 'Carpentry', amt: '₹2,000', stat: 'Completed', color: 'text-[#10B981] bg-[#10B981]/10 border-[#10B981]/20' },
-                { id: '8814', c: 'Sunita Rao', w: 'Deepak Jha', s: 'Cleaning', amt: '₹600', stat: 'Cancelled', color: 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10' },
-              ].map((row, i) => (
-                <tr key={i} className="border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
-                  <td className="p-4 font-bold text-gray-900 dark:text-white">#BK-{row.id}</td>
-                  <td className="p-4 text-gray-600 dark:text-gray-300">{row.c}</td>
-                  <td className="p-4 text-gray-600 dark:text-gray-300">{row.w}</td>
-                  <td className="p-4 text-gray-500">{row.s}</td>
-                  <td className="p-4 text-gray-900 dark:text-white font-medium">{row.amt}</td>
-                  <td className="p-4"><span className={`px-2.5 py-1 text-[10px] uppercase font-bold rounded-md border ${row.color}`}>{row.stat}</span></td>
-                  <td className="p-4"><button className="text-[#3B82F6] hover:text-[#2563EB] dark:hover:text-white text-xs font-bold transition-colors">View</button></td>
-                </tr>
-              ))}
+              {allBookings.length === 0 ? (
+                <tr><td colSpan="7" className="p-8 text-center text-gray-500">No bookings found.</td></tr>
+              ) : allBookings.map((row) => {
+                let color = 'text-gray-500 bg-gray-100 dark:bg-white/5';
+                if (row.status === 'completed') color = 'text-[#10B981] bg-[#10B981]/10 border-[#10B981]/20';
+                else if (row.status === 'cancelled') color = 'text-red-500 bg-red-50 dark:bg-red-500/10 border-red-500/20';
+                else color = 'text-[#3B82F6] bg-[#3B82F6]/10 border-[#3B82F6]/20';
+
+                return (
+                  <tr key={row.id} className="border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
+                    <td className="p-4 font-bold text-gray-900 dark:text-white">#BK-{row.id.slice(-6).toUpperCase()}</td>
+                    <td className="p-4 text-gray-600 dark:text-gray-300">{row.customerName || 'Unknown'}</td>
+                    <td className="p-4 text-gray-600 dark:text-gray-300">{row.workerName || 'Unknown'}</td>
+                    <td className="p-4 text-gray-500">{row.service}</td>
+                    <td className="p-4 text-gray-900 dark:text-white font-medium">₹{row.totalAmount || 0}</td>
+                    <td className="p-4"><span className={`px-2.5 py-1 text-[10px] uppercase font-bold rounded-md border ${color}`}>{row.status}</span></td>
+                    <td className="p-4 flex gap-2">
+                      {row.status !== 'cancelled' && row.status !== 'completed' && (
+                        <button onClick={() => handleCancelBooking(row.id)} className="text-red-500 hover:text-red-600 text-xs font-bold transition-colors">Cancel</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -288,10 +339,10 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: 'Gross revenue', val: '₹4.8L', sub: 'this month' },
-          { label: 'Commission earned', val: '₹72K', sub: '15% avg rate' },
-          { label: 'Refunds', val: '₹8,400', sub: '1.7% refund rate' },
-          { label: 'Net revenue', val: '₹63.6K', sub: 'platform net' },
+          { label: 'Gross revenue', val: `₹${totalRevenue.toLocaleString('en-IN')}`, sub: 'Lifetime total' },
+          { label: 'Commission earned', val: `₹${platformFee.toLocaleString('en-IN')}`, sub: '15% avg rate' },
+          { label: 'Active Users', val: activeUsersCount.toString(), sub: 'Customers on platform' },
+          { label: 'Active Workers', val: activeWorkersCount.toString(), sub: 'Workers on platform' },
         ].map((stat, i) => (
           <div key={i} className="glass-card rounded-2xl p-5">
             <p className="text-gray-500 text-xs mb-1 font-medium">{stat.label}</p>
@@ -355,8 +406,8 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      <div className="glass-card rounded-2xl overflow-hidden">
-        <table className="w-full text-left border-collapse">
+      <div className="glass-card rounded-2xl overflow-x-auto">
+        <table className="w-full text-left border-collapse whitespace-nowrap md:whitespace-normal">
           <thead>
             <tr className="bg-gray-50 dark:bg-white/[0.02] border-b border-gray-200 dark:border-white/5 text-gray-500 text-xs uppercase tracking-wider font-bold">
               <th className="p-4">Name</th><th className="p-4">Type</th><th className="p-4">Phone</th>
@@ -396,8 +447,8 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-white/5">
         <h2 className="text-xl font-syne font-bold text-gray-900 dark:text-white flex items-center gap-2"><Ban className="w-5 h-5"/> Blacklist / suspend accounts</h2>
       </div>
-      <div className="glass-card rounded-2xl overflow-hidden">
-        <table className="w-full text-left border-collapse">
+      <div className="glass-card rounded-2xl overflow-x-auto">
+        <table className="w-full text-left border-collapse whitespace-nowrap md:whitespace-normal">
           <thead>
             <tr className="bg-gray-50 dark:bg-white/[0.02] border-b border-gray-200 dark:border-white/5 text-gray-500 text-xs uppercase tracking-wider font-bold">
               <th className="p-4">Name</th><th className="p-4">Type</th><th className="p-4">Status</th>
@@ -405,16 +456,16 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody className="text-sm">
-            {[
-              { n: 'Fake Worker 01', t: 'Worker', s: 'Blacklisted', r: 'Fraudulent KYC docs', d: '12 Jun' },
-              { n: 'Deepak Jha', t: 'Worker', s: 'Suspended', r: 'Sent sub without notice', d: '20 Jun' },
-              { n: 'Troll User 09', t: 'Customer', s: 'Blacklisted', r: 'Repeated false disputes', d: '5 Jun' }
-            ].map((u, i) => (
-              <tr key={i} className="border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
-                <td className="p-4 text-gray-900 dark:text-white font-bold">{u.n}</td><td className="p-4 text-gray-500 dark:text-gray-400">{u.t}</td>
-                <td className="p-4"><span className="px-2.5 py-1 text-[10px] uppercase font-bold rounded-md border text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20">{u.s}</span></td>
-                <td className="p-4 text-gray-500 dark:text-gray-400">{u.r}</td><td className="p-4 text-gray-400 dark:text-gray-500">{u.d}</td>
-                <td className="p-4"><button onClick={() => showToast(`${u.n} Reinstated`)} className="text-[#10B981] hover:text-[#059669] dark:hover:text-white transition-colors text-xs font-bold">Reinstate</button></td>
+            {allUsers.filter(u => u.isBanned).length === 0 ? (
+              <tr><td colSpan="6" className="p-8 text-center text-gray-500">No banned users found.</td></tr>
+            ) : allUsers.filter(u => u.isBanned).map((u) => (
+              <tr key={u.id} className="border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
+                <td className="p-4 text-gray-900 dark:text-white font-bold">{u.name || 'Unknown'}</td>
+                <td className="p-4 text-gray-500 dark:text-gray-400 capitalize">{u.role}</td>
+                <td className="p-4"><span className="px-2.5 py-1 text-[10px] uppercase font-bold rounded-md border text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20">Suspended</span></td>
+                <td className="p-4 text-gray-500 dark:text-gray-400">Admin action</td>
+                <td className="p-4 text-gray-400 dark:text-gray-500">-</td>
+                <td className="p-4"><button onClick={() => handleSuspendUser(u.id, u.name, true)} className="text-[#10B981] hover:text-[#059669] dark:hover:text-white transition-colors text-xs font-bold">Reinstate</button></td>
               </tr>
             ))}
           </tbody>
@@ -460,7 +511,7 @@ export default function AdminDashboard() {
                 <option className="bg-white dark:bg-[#060D1F]">Customers Only</option>
               </select>
             </div>
-            <button onClick={() => showToast('Notification sent to 12.4K users!')} className="w-full py-3.5 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white rounded-xl hover:scale-[1.02] transition-transform font-bold flex justify-center items-center gap-2 shadow-lg shadow-[#3B82F6]/20">
+            <button onClick={handleSendNotification} className="w-full py-3.5 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white rounded-xl hover:scale-[1.02] transition-transform font-bold flex justify-center items-center gap-2 shadow-lg shadow-[#3B82F6]/20">
               <Send className="w-4 h-4"/> Send Notification
             </button>
           </div>
@@ -566,6 +617,16 @@ export default function AdminDashboard() {
               </button>
             )
           })}
+        </div>
+
+        <div className="p-4 md:mt-auto border-t border-gray-200 dark:border-white/5">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="whitespace-nowrap">Logout</span>
+          </button>
         </div>
       </aside>
 

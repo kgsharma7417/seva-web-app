@@ -14,7 +14,7 @@ export default function WorkerDashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { currentUser, userData, updateUserProfile } = useAuth();
+  const { currentUser, userData, updateUserProfile, logout } = useAuth();
   const db = getFirestore(app);
   const storage = getStorage(app);
   const [allBookings, setAllBookings] = useState([]);
@@ -59,14 +59,34 @@ export default function WorkerDashboard() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (e) {
+      console.error(e);
+      alert("Failed to log out");
+    }
+  };
+
   // Derived Data for Worker Profile
+  const completenessScore = () => {
+    let score = 20; // Base score for signing up
+    if (userData?.avatar) score += 10;
+    if (userData?.services?.length > 0) score += 20;
+    if (userData?.bankAccount) score += 20;
+    if (userData?.idProof) score += 20;
+    if (userData?.vaccinationDate) score += 10;
+    return score;
+  };
+
   const workerProfile = {
     name: userData?.name || "New Worker",
-    skill: userData?.specialty || "Setup your profile",
+    skill: userData?.services ? userData.services.join(' • ') : (userData?.specialty || "Setup your profile"),
     rating: userData?.rating || 5.0,
     avatar: userData?.avatar || (userData?.name ? userData.name.substring(0, 2).toUpperCase() : "W"),
-    completeness: userData?.hourlyRate ? 100 : 40,
-    responseRate: "98%",
+    completeness: completenessScore(),
+    responseRate: userData?.responseRate ? `${userData.responseRate}%` : "100%",
     location: userData?.area || "Agra City"
   };
 
@@ -262,6 +282,16 @@ export default function WorkerDashboard() {
             )
           })}
         </div>
+
+        <div className="p-4 md:mt-auto border-t border-gray-200 dark:border-white/5">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="whitespace-nowrap">Logout</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -352,7 +382,7 @@ export default function WorkerDashboard() {
                       </div>
                       <div>
                         <h3 className="text-gray-900 dark:text-white font-syne font-bold text-lg">You have {pendingRequests.length} new requests!</h3>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">Respond quickly to maintain your 98% response rate.</p>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">Respond quickly to maintain your response rate.</p>
                       </div>
                     </div>
                     <button onClick={() => setActiveTab('requests')} className="hidden sm:block px-5 py-2.5 bg-[#10B981] text-white dark:text-[#060D1F] font-bold rounded-xl hover:bg-[#059669] hover:text-white transition-colors">
@@ -418,7 +448,7 @@ export default function WorkerDashboard() {
                         <span className="text-[#10B981] font-bold">{workerProfile.responseRate}</span>
                       </div>
                       <div className="h-1.5 w-full bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-[#10B981] w-[98%]"></div>
+                        <div className="h-full bg-[#10B981]" style={{width: workerProfile.responseRate}}></div>
                       </div>
                     </div>
                     <div>
@@ -579,35 +609,27 @@ export default function WorkerDashboard() {
                   <h4 className="text-gray-900 dark:text-white font-bold mb-6 text-lg">Profile Checklist</h4>
                   <div className="space-y-4">
                     {[
-                      { label: 'Basic Details', done: true },
-                      { label: 'Profile Picture', done: true },
-                      { label: 'Bank Account Linked', done: true },
-                      { label: 'Aadhar / ID Verification', done: false },
-                      { label: 'Vaccination Certificate', done: false },
+                      { label: 'Basic Details (Name, Phone)', done: !!userData?.name },
+                      { label: 'Professional Setup (Services & Pricing)', done: !!(userData?.services?.length > 0 && userData?.hourlyRate), action: () => setIsEditModalOpen(true) },
+                      { label: 'Bank Account Linked', done: !!userData?.bankAccount, action: () => setIsEditModalOpen(true) },
+                      { label: 'Aadhar / ID Verification', done: !!userData?.idProof, action: () => setIsIDModalOpen(true) },
+                      { label: 'Vaccination Certificate', done: !!userData?.vaccinationDate, action: () => setIsEditModalOpen(true) },
                     ].map((item, i) => (
                       <div key={i} className="flex items-center gap-4">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${item.done ? 'bg-[#10B981] text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-gray-600'}`}>
                           {item.done && <Check className="w-3.5 h-3.5" />}
                         </div>
-                        <span className={`text-sm ${item.done ? 'text-gray-500 dark:text-gray-300' : 'text-gray-900 dark:text-white font-medium'}`}>{item.label}</span>
+                        <div className="flex-1">
+                          <p className={`text-sm ${item.done ? 'text-gray-500 dark:text-gray-300' : 'text-gray-900 dark:text-white font-medium'}`}>{item.label}</p>
+                          {!item.done && item.label === 'Bank Account Linked' && <p className="text-xs text-gray-500">Required for payouts</p>}
+                        </div>
+                        {!item.done && item.action && (
+                          <button onClick={item.action} className="text-xs text-[#3B82F6] hover:text-[#2563EB] dark:hover:text-white font-bold">
+                            Complete
+                          </button>
+                        )}
                       </div>
                     ))}
-                    {/* ID Proof Entry */}
-                    <div className="flex items-center gap-4">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${userData?.idProof ? 'bg-[#10B981] text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-gray-600'}`}>
-                        {userData?.idProof && <Check className="w-3.5 h-3.5" />}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-900 dark:text-white text-sm">ID Proof</p>
-                        <p className="text-xs text-gray-500">{userData?.idProof ? 'Verified' : 'Pending Verification'}</p>
-                      </div>
-                      <button 
-                        onClick={() => setIsIDModalOpen(true)} 
-                        className="ml-auto text-xs text-[#3B82F6] hover:text-[#2563EB] dark:hover:text-white font-bold"
-                      >
-                        {userData?.idProof ? 'View' : 'Upload'}
-                      </button>
-                    </div>
                   </div>
                 </div>
 
@@ -631,6 +653,32 @@ export default function WorkerDashboard() {
                       <p className="font-semibold text-gray-900 dark:text-white">{workerProfile.location}</p>
                       <p className="text-xs text-gray-500">Lat: {workerLocation.lat.toFixed(4)}, Lng: {workerLocation.lng.toFixed(4)}</p>
                     </div>
+                  </div>
+                </div>
+
+                {/* My Work Portfolio */}
+                <div className="bg-white dark:glass-card border border-gray-200 dark:border-white/5 rounded-3xl p-8 shadow-sm dark:shadow-none col-span-1 md:col-span-2 mt-2">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h4 className="text-gray-900 dark:text-white font-bold text-lg flex items-center gap-2">
+                        <Camera className="w-5 h-5 text-[#8B5CF6]" />
+                        My Work Gallery
+                      </h4>
+                      <p className="text-sm text-gray-500 mt-1">Upload photos of your past work to build trust with customers</p>
+                    </div>
+                    <label className="cursor-pointer px-4 py-2 bg-[#8B5CF6]/10 text-[#8B5CF6] font-bold rounded-xl hover:bg-[#8B5CF6]/20 transition-colors text-sm">
+                      Upload Photo
+                      <input type="file" className="hidden" accept="image/*" onChange={() => alert("Portfolio upload requires Storage integration, but UI is ready!")} />
+                    </label>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/10 flex flex-col items-center justify-center text-gray-400 hover:border-[#8B5CF6]/50 hover:text-[#8B5CF6] transition-colors cursor-pointer bg-gray-50 dark:bg-white/5">
+                        <Upload className="w-6 h-6 mb-2" />
+                        <span className="text-xs font-medium">Add Photo</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
