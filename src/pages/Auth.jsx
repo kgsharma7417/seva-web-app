@@ -19,14 +19,16 @@ export default function AuthPage() {
   const { t } = useLanguage();
 
   React.useEffect(() => {
-    if (currentUser && userRole) {
+    // Only auto-redirect if user visits /auth while already logged in
+    // and not actively submitting a form
+    if (currentUser && userRole && !loading) {
       if (userRole === 'worker') {
         navigate('/worker-dashboard');
       } else {
         navigate('/dashboard');
       }
     }
-  }, [currentUser, userRole, navigate]);
+  }, [currentUser, userRole, loading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,10 +38,10 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         await login(email, password, isWorker);
-        // Navigation will be handled by useEffect
+        navigate(isWorker ? '/worker-dashboard' : '/dashboard');
       } else {
         await signup(email, password, name, isWorker, workerService);
-        // Navigation will be handled by useEffect
+        navigate(isWorker ? '/worker-dashboard' : '/dashboard');
       }
     } catch (err) {
       setError(err.message || 'Failed to authenticate');
@@ -52,7 +54,7 @@ export default function AuthPage() {
       setError('');
       setLoading(true);
       await loginWithGoogle(isWorker);
-      // Navigation will be handled by useEffect
+      navigate(isWorker ? '/worker-dashboard' : '/dashboard');
     } catch (err) {
       setError(err.message || 'Failed to authenticate with Google');
     }

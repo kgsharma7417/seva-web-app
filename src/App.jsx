@@ -43,6 +43,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { LocationProvider } from './context/LocationContext';
 import AuthPage from './pages/Auth';
+import ProtectedRoute from './components/common/ProtectedRoute';
 
 function App() {
   return (
@@ -58,12 +59,38 @@ function App() {
                 <Route path="/listing" element={<ServiceListing />} />
                 <Route path="/worker" element={<WorkerProfile />} />
                 <Route path="/worker/:id" element={<WorkerProfile />} />
-                <Route path="/dashboard" element={<UserDashboard />} />
-                <Route path="/worker-dashboard" element={<WorkerDashboard />} />
-                <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/review" element={<ReviewForm />} />
-                <Route path="/booking" element={<BookingFlow />} />
-                <Route path="/booking/:id" element={<BookingFlow />} />
+                
+                {/* Protected Routes */}
+                <Route path="/dashboard" element={
+                  <ProtectedRoute allowedRoles={['customer', 'user', 'worker']}>
+                    <UserDashboard />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/worker-dashboard" element={
+                  <ProtectedRoute allowedRoles={['worker']}>
+                    <WorkerDashboard />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/admin" element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/booking" element={
+                  <ProtectedRoute>
+                    <BookingFlow />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/booking/:id" element={
+                  <ProtectedRoute>
+                    <BookingFlow />
+                  </ProtectedRoute>
+                } />
               </Routes>
               <FloatingNav />
             </Router>

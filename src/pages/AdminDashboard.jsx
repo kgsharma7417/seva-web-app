@@ -5,6 +5,8 @@ import {
   Download, Plus, Send, X, Check, Bell
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { getFirestore, collection, query, onSnapshot, doc, updateDoc, where } from 'firebase/firestore';
+import app from '../firebase';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('kyc');
@@ -22,6 +24,67 @@ export default function AdminDashboard() {
 
   // Switch Tab
   const handleTabChange = (id) => setActiveTab(id);
+
+  // Firestore Data States
+  const [allUsers, setAllUsers] = useState([]);
+  const [allBookings, setAllBookings] = useState([]);
+  const db = getFirestore(app);
+
+  useEffect(() => {
+    // Fetch all users
+    const usersUnsub = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllUsers(usersData);
+    });
+
+    // Fetch all bookings
+    const bookingsUnsub = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+      const bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllBookings(bookingsData);
+    });
+
+    return () => {
+      usersUnsub();
+      bookingsUnsub();
+    };
+  }, [db]);
+
+  // Derived Data
+  const kycQueue = allUsers.filter(u => u.role === 'worker' && u.idProof && !u.verified);
+  const totalRevenue = allBookings.filter(b => b.status === 'completed').reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
+  const platformFee = totalRevenue * 0.15; // Assuming 15% platform fee
+  const activeUsersCount = allUsers.filter(u => u.role === 'customer').length;
+  const activeWorkersCount = allUsers.filter(u => u.role === 'worker').length;
+
+  const handleApproveKYC = async (workerId, name) => {
+    try {
+      await updateDoc(doc(db, 'users', workerId), { verified: true });
+      showToast(`${name} approved ✓`);
+    } catch (e) {
+      console.error(e);
+      showToast("Error approving worker");
+    }
+  };
+
+  const handleRejectKYC = async (workerId, name) => {
+    try {
+      await updateDoc(doc(db, 'users', workerId), { idProof: false, idProofUrl: null });
+      showToast(`${name} rejected`);
+    } catch (e) {
+      console.error(e);
+      showToast("Error rejecting worker");
+    }
+  };
+
+  const handleSuspendUser = async (userId, name, isCurrentlyBanned) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), { isBanned: !isCurrentlyBanned });
+      showToast(`${name} ${!isCurrentlyBanned ? 'suspended' : 'unsuspended'} ✓`);
+    } catch (e) {
+      console.error(e);
+      showToast("Error updating user status");
+    }
+  };
 
   // ============================================================================
   // SIDEBAR NAVIGATION CONFIG
@@ -51,7 +114,7 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-white/5">
         <h2 className="text-xl font-syne font-bold text-gray-900 dark:text-white flex items-center gap-2"><IdCard className="w-5 h-5"/> Worker verification queue</h2>
         <div className="flex items-center gap-3">
-          <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 rounded-md text-xs font-bold">7 pending</span>
+          <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 rounded-md text-xs font-bold">{kycQueue.length} pending</span>
           <button className="px-4 py-2 glass-card text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg flex items-center gap-2 text-sm"><Filter className="w-4 h-4"/> Filter</button>
         </div>
       </div>
@@ -72,33 +135,33 @@ export default function AdminDashboard() {
       </div>
 
       <div className="space-y-4">
-        {[
-          { name: 'Ravi Agarwal', init: 'RA', skill: 'Electrician', time: '2h ago', phone: '+91 98765 43210', docs: ['Aadhaar', 'PAN Card', 'Electrician cert', 'Selfie'], color: 'from-[#3B82F6] to-[#2563EB]' },
-          { name: 'Priya Sharma', init: 'PS', skill: 'Plumber', time: '5h ago', phone: '+91 87654 32109', docs: ['Aadhaar', 'PAN Card', 'Selfie'], color: 'from-[#10B981] to-[#059669]' },
-          { name: 'Mohit Kumar', init: 'MK', skill: 'Carpenter', time: '8h ago', phone: '+91 76543 21098', docs: ['Aadhaar', 'Skill cert'], color: 'from-yellow-400 to-yellow-600' },
-        ].map((item, i) => (
-          <div key={i} className="glass-card rounded-2xl p-6 flex flex-col sm:flex-row gap-6 items-start hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
-            <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${item.color} flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-lg`}>{item.init}</div>
+        {kycQueue.length === 0 ? (
+          <div className="text-center py-10 glass-card rounded-2xl w-full">
+            <p className="text-gray-500">No pending verification requests.</p>
+          </div>
+        ) : kycQueue.map((worker) => (
+          <div key={worker.id} className="glass-card rounded-2xl p-6 flex flex-col sm:flex-row gap-6 items-start hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
+            <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-[#3B82F6] to-[#2563EB] flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-lg`}>
+              {worker.name ? worker.name.substring(0,2).toUpperCase() : 'W'}
+            </div>
             <div className="flex-1">
               <div className="flex items-center gap-3">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{item.name}</h3>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{worker.name || 'Worker'}</h3>
                 <span className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 text-[10px] uppercase font-bold rounded-md">Pending</span>
               </div>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{item.skill} • Submitted {item.time} • {item.phone}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{worker.specialty || 'Service'} • {worker.phone || 'No phone'}</p>
               
               <div className="flex flex-wrap gap-2 mt-4">
-                {item.docs.map(doc => (
-                  <span key={doc} className="px-3 py-1 glass-card text-gray-600 dark:text-gray-300 text-xs rounded-lg flex items-center gap-1.5">
-                    {doc.includes('cert') ? <Award className="w-3.5 h-3.5"/> : doc.includes('Selfie') ? <Camera className="w-3.5 h-3.5"/> : <FileText className="w-3.5 h-3.5"/>}
-                    {doc}
-                  </span>
-                ))}
+                {worker.idProofUrl && (
+                  <a href={worker.idProofUrl} target="_blank" rel="noreferrer" className="px-3 py-1 glass-card text-blue-600 dark:text-blue-400 text-xs rounded-lg flex items-center gap-1.5 hover:underline hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                    <FileText className="w-3.5 h-3.5"/> View ID Proof
+                  </a>
+                )}
               </div>
 
               <div className="flex gap-3 mt-5">
-                <button onClick={() => showToast(`${item.name} approved ✓`)} className="px-4 py-2 bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20 hover:bg-[#10B981] hover:text-white dark:hover:text-[#060D1F] transition-all rounded-lg text-sm font-bold">Approve</button>
-                <button onClick={() => showToast(`${item.name} rejected`)} className="px-4 py-2 bg-red-50 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 hover:bg-red-500 hover:text-white transition-all rounded-lg text-sm font-bold">Reject</button>
-                <button className="px-4 py-2 glass-card text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-all rounded-lg text-sm font-medium">View docs</button>
+                <button onClick={() => handleApproveKYC(worker.id, worker.name || 'Worker')} className="px-4 py-2 bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20 hover:bg-[#10B981] hover:text-white dark:hover:text-[#060D1F] transition-all rounded-lg text-sm font-bold">Approve</button>
+                <button onClick={() => handleRejectKYC(worker.id, worker.name || 'Worker')} className="px-4 py-2 bg-red-50 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 hover:bg-red-500 hover:text-white transition-all rounded-lg text-sm font-bold">Reject</button>
               </div>
             </div>
           </div>
@@ -301,21 +364,27 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody className="text-sm">
-            {[
-              { n: 'Neha Gupta', t: 'Customer', p: '+91 99001 12233', b: 18, s: 'Active', c: 'text-[#10B981] bg-[#10B981]/10 border-[#10B981]/20' },
-              { n: 'Ravi Agarwal', t: 'Worker', p: '+91 98765 43210', b: 42, s: 'Active', c: 'text-[#10B981] bg-[#10B981]/10 border-[#10B981]/20' },
-              { n: 'Raju Singh', t: 'Worker', p: '+91 87654 32109', b: 9, s: 'Disputed', c: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20' },
-            ].map((u, i) => (
-              <tr key={i} className="border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
-                <td className="p-4 text-gray-900 dark:text-white font-bold">{u.n}</td><td className="p-4 text-gray-500 dark:text-gray-400">{u.t}</td>
-                <td className="p-4 text-gray-500 dark:text-gray-400">{u.p}</td><td className="p-4 text-gray-900 dark:text-white">{u.b}</td>
-                <td className="p-4"><span className={`px-2.5 py-1 text-[10px] uppercase font-bold rounded-md border ${u.c}`}>{u.s}</span></td>
+            {allUsers.map((u) => {
+              const bookingsCount = allBookings.filter(b => b.workerId === u.id || b.customerId === u.id).length;
+              const isBanned = !!u.isBanned;
+              return (
+              <tr key={u.id} className="border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
+                <td className="p-4 text-gray-900 dark:text-white font-bold">{u.name || 'Unknown'}</td>
+                <td className="p-4 text-gray-500 dark:text-gray-400 capitalize">{u.role || 'user'}</td>
+                <td className="p-4 text-gray-500 dark:text-gray-400">{u.phone || 'N/A'}</td>
+                <td className="p-4 text-gray-900 dark:text-white">{bookingsCount}</td>
+                <td className="p-4">
+                  <span className={`px-2.5 py-1 text-[10px] uppercase font-bold rounded-md border ${isBanned ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20' : 'text-[#10B981] bg-[#10B981]/10 border-[#10B981]/20'}`}>
+                    {isBanned ? 'Suspended' : 'Active'}
+                  </span>
+                </td>
                 <td className="p-4 flex gap-3">
-                  <button className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors text-xs font-bold">Edit</button>
-                  <button onClick={() => {setSuspendUser(u.n); setModalOpen(true)}} className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors text-xs font-bold">Suspend</button>
+                  <button onClick={() => handleSuspendUser(u.id, u.name || 'User', isBanned)} className={`${isBanned ? 'text-[#10B981] hover:text-[#059669]' : 'text-red-500 hover:text-red-600'} transition-colors text-xs font-bold`}>
+                    {isBanned ? 'Reinstate' : 'Suspend'}
+                  </button>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

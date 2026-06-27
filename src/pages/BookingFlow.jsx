@@ -23,14 +23,7 @@ export default function BookingFlow() {
   const [loading, setLoading] = useState(true);
   const db = getFirestore(app);
 
-  const fallbackWorker = {
-    id: 'dummy_worker_id',
-    name: 'Ramesh Kumar',
-    service: t('cat_ac'),
-    rating: 4.9,
-    price: 299,
-    avatar: 'RK'
-  };
+  // Removed fallbackWorker to enforce real booking flow
 
   useEffect(() => {
     const fetchWorker = async () => {
@@ -69,19 +62,19 @@ export default function BookingFlow() {
 
       setIsSubmitting(true);
       try {
-        const activeWorker = worker || fallbackWorker;
+        const activeWorker = worker;
         const bookingData = {
           customerId: currentUser.uid,
-          customerName: currentUser.displayName || 'Customer',
+          customerName: currentUser.displayName || userData?.name || 'Customer',
           workerId: activeWorker.id, 
           workerName: activeWorker.name,
           service: activeWorker.service,
           status: 'pending',
           date: selectedDate,
           time: selectedTime,
-          address: 'Flat 402, Taj Residency, Fatehabad Road, Agra',
-          price: (worker || fallbackWorker).price,
-          totalAmount: (worker || fallbackWorker).price + 45,
+          address: userData?.area || 'Flat 402, Taj Residency, Fatehabad Road, Agra',
+          price: worker.price,
+          totalAmount: worker.price + 45, // Add ₹45 platform fee/tax
           paymentMethod: paymentMethod,
           createdAt: serverTimestamp()
         };
@@ -106,7 +99,17 @@ export default function BookingFlow() {
     return <div className="min-h-screen flex items-center justify-center bg-[#060D1F] text-white">Loading...</div>;
   }
 
-  const activeWorker = worker || fallbackWorker;
+  if (!worker) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#060D1F] text-white">
+        <h2 className="text-2xl font-bold mb-2">Worker Not Found</h2>
+        <p className="text-gray-400 mb-6">The worker you are trying to book does not exist.</p>
+        <button onClick={() => navigate('/listing')} className="px-6 py-3 bg-[#3B82F6] rounded-xl font-bold text-white">Go Back</button>
+      </div>
+    );
+  }
+
+  const activeWorker = worker;
 
   if (isSuccess) {
     return (

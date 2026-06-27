@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar as CalendarIcon, Clock, TrendingUp, IndianRupee, Check, X, ChevronLeft, ChevronRight, Star, Settings, LogOut, Bell, Shield, AlertCircle, MapPin } from 'lucide-react';
+import { Star, MapPin, Clock, FileText, CheckCircle2, ChevronRight, Menu, X, Bell, LogOut, Wallet, Shield, AlertCircle, Camera, Upload, Calendar as CalendarIcon, Zap, TrendingUp, IndianRupee, Check, ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import app from '../firebase';
 import MapSelector from '../components/common/MapSelector';
 import EditProfileModal from '../components/profile/EditProfileModal';
@@ -15,9 +16,12 @@ export default function WorkerDashboard() {
   const navigate = useNavigate();
   const { currentUser, userData, updateUserProfile } = useAuth();
   const db = getFirestore(app);
+  const storage = getStorage(app);
   const [allBookings, setAllBookings] = useState([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isIDModalOpen, setIsIDModalOpen] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!currentUser) {
@@ -25,10 +29,10 @@ export default function WorkerDashboard() {
       return;
     }
 
-    // Listen to bookings assigned to 'dummy_worker_id' for testing, or the current user's UID
+    // Listen to bookings assigned to the current user's UID
     const q = query(
       collection(db, 'bookings'),
-      where('workerId', 'in', ['dummy_worker_id', currentUser.uid])
+      where('workerId', '==', currentUser.uid)
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -66,8 +70,8 @@ export default function WorkerDashboard() {
     location: userData?.area || "Agra City"
   };
 
-  const workerLocation = userData?.coordinates || { lat: 27.1767, lng: 78.0081 };
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [workerLocation, setWorkerLocation] = useState(userData?.coordinates || { lat: 27.1767, lng: 78.0081 });
 
   const handleUpdateLocation = async (loc) => {
     try {
@@ -79,14 +83,116 @@ export default function WorkerDashboard() {
     }
   };
 
+  const handleIDUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+      alert('Please upload an image or PDF file.');
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const storageRef = ref(storage, `idProofs/${currentUser.uid}_${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(Math.round(progress));
+        }, 
+        (error) => {
+          console.error("Upload failed", error);
+          alert("Failed to upload document. Try again.");
+          setUploading(false);
+        }, 
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          await updateUserProfile({ 
+            idProof: true,
+            idProofUrl: downloadURL
+          });
+          setUploading(false);
+          setIsIDModalOpen(false);
+          alert("ID uploaded successfully!");
+        }
+      );
+    } catch (error) {
+      console.error("Upload error", error);
+      setUploading(false);
+    }
+  };
+
   const completedJobs = allBookings.filter(b => b.status === 'completed');
-  const totalEarnings = completedJobs.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
   
-  const earnings = {
-    daily: totalEarnings,
-    weekly: totalEarnings,
-    monthly: totalEarnings,
-    walletBalance: totalEarnings,
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfWeek = startOfDay - (now.getDay() * 24 * 60 * 60 * 1000);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+  let daily = 0;
+  let weekly = 0;
+  let monthly = 0;
+
+  completedJobs.forEach(b => {
+    const amount = Number(b.totalAmount) || 0;
+    const time = b.createdAt?.seconds * 1000 || 0; 
+    
+    if (time >= startOfDay) daily += amount;
+    if (time >= startOfWeek) weekly += amount;
+    if (time >= startOfMonth) monthly += amount;
+  });
+
+  const walletBalance = userData?.walletBalance || daily + weekly; // Fallback to simulated balance if not in DB
+  
+  const earnings = { daily, weekly, monthly, walletBalance };
+
+  const handleToggleOnline = async () => {
+    try {
+      const isCurrentlyOnline = !!userData?.isOnline;
+      await updateUserProfile({ isOnline: !isCurrentlyOnline });
+      showToast(!isCurrentlyOnline ? "You are now ONLINE" : "You are now OFFLINE");
+    } catch (e) {
+      console.error(e);
+      alert("Failed to update status");
+    }
+  };
+
+  // Play notification sound if pending requests increase
+  React.useEffect(() => {
+    const pendingCount = allBookings.filter(b => b.status === 'pending').length;
+    if (pendingCount > 0) {
+      try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audio.play().catch(e => console.log("Audio play blocked by browser", e));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [allBookings]);
+
+  const handleRequestPayout = async () => {
+    if (earnings.walletBalance < 500) return;
+    try {
+      await updateUserProfile({
+        walletBalance: 0,
+        transactions: [{
+          id: 'P' + Date.now(),
+          type: 'debit',
+          title: 'Payout Request',
+          description: 'Bank Transfer (Processing)',
+          amount: earnings.walletBalance,
+          date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+        }, ...(userData?.transactions || [])]
+      });
+      alert(`Payout of ₹${earnings.walletBalance} requested successfully! Money will be credited in 24-48 hours.`);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to process payout.");
+    }
   };
 
   const CircularProgress = ({ value, label, sublabel, colorClass }) => (
@@ -179,14 +285,24 @@ export default function WorkerDashboard() {
           </div>
           
           {/* Quick Stats */}
-          <div className="flex gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+          <div className="flex gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 items-center">
+            <button 
+              onClick={handleToggleOnline}
+              className={`px-6 py-3 rounded-2xl font-bold text-sm shadow-sm transition-colors ${
+                userData?.isOnline 
+                ? 'bg-gradient-to-r from-[#10B981] to-[#059669] text-white shadow-lg shadow-[#10B981]/25' 
+                : 'bg-gray-100 dark:bg-white/10 text-gray-500 hover:bg-gray-200 dark:hover:bg-white/20'
+              }`}
+            >
+              {userData?.isOnline ? 'ONLINE' : 'OFFLINE'}
+            </button>
             <div className="bg-gray-50 border border-gray-200 dark:border-white/5 dark:glass-card px-5 py-3 rounded-2xl min-w-[120px] shadow-sm dark:shadow-none">
               <p className="text-gray-500 text-xs mb-1 font-medium">Daily Earnings</p>
               <p className="text-gray-900 dark:text-white font-syne font-bold text-lg">₹{earnings.daily}</p>
             </div>
             <div className="bg-gray-50 border border-gray-200 dark:border-white/5 dark:glass-card px-5 py-3 rounded-2xl min-w-[120px] shadow-sm dark:shadow-none">
               <p className="text-gray-500 text-xs mb-1 font-medium">Completed Jobs</p>
-              <p className="text-gray-900 dark:text-white font-syne font-bold text-lg">4 Today</p>
+              <p className="text-gray-900 dark:text-white font-syne font-bold text-lg">{completedJobs.length} Total</p>
             </div>
           </div>
         </div>
@@ -393,7 +509,7 @@ export default function WorkerDashboard() {
                   </div>
                   <button 
                     disabled={earnings.walletBalance < 500}
-                    onClick={() => alert(`Payout of ₹${earnings.walletBalance} requested successfully! Money will be credited in 24-48 hours.`)}
+                    onClick={handleRequestPayout}
                     className="px-6 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-[#060D1F] rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-bold text-sm shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     Request Payout
@@ -542,23 +658,41 @@ export default function WorkerDashboard() {
       />
       <EditProfileModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} />
       
-      {/* ID Modal */}
       {isIDModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-          <div className="bg-white dark:bg-[#0A132D] p-6 rounded-2xl max-w-sm w-full relative">
-            <button onClick={() => setIsIDModalOpen(false)} className="absolute top-4 right-4 text-gray-500">X</button>
-            <h3 className="font-syne font-bold text-xl mb-4 text-gray-900 dark:text-white">Upload ID Proof</h3>
-            <p className="text-gray-500 mb-6">Please upload your Aadhar Card or Driver's License.</p>
-            <button 
-              onClick={() => {
-                updateUserProfile({ idProof: true });
-                setIsIDModalOpen(false);
-                alert("ID uploaded successfully!");
-              }}
-              className="w-full bg-[#10B981] text-white py-3 rounded-xl font-bold"
-            >
-              Simulate Upload
+          <div className="bg-white dark:bg-[#0A132D] p-6 rounded-3xl max-w-sm w-full relative">
+            <button onClick={() => setIsIDModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-gray-900 transition-colors">
+              <X className="w-5 h-5" />
             </button>
+            <h3 className="font-syne font-bold text-xl mb-2 text-gray-900 dark:text-white">Upload ID Proof</h3>
+            <p className="text-gray-500 text-sm mb-6">Please upload your Aadhar Card, PAN Card or Driver's License.</p>
+            
+            <div className="border-2 border-dashed border-gray-300 dark:border-white/10 rounded-2xl p-8 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition-colors relative cursor-pointer group">
+              <input 
+                type="file" 
+                accept="image/*,application/pdf"
+                onChange={handleIDUpload}
+                disabled={uploading}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <Upload className="w-10 h-10 text-[#10B981] mx-auto mb-3 group-hover:scale-110 transition-transform" />
+              <p className="text-gray-900 dark:text-white font-medium mb-1">
+                {uploading ? 'Uploading...' : 'Click or drag file here'}
+              </p>
+              <p className="text-xs text-gray-500">Supports JPG, PNG, PDF (Max 5MB)</p>
+            </div>
+
+            {uploading && (
+              <div className="mt-4">
+                <div className="h-2 w-full bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-[#10B981] transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2 text-center">{uploadProgress}% uploaded</p>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -39,6 +39,7 @@ export default function ServiceListing() {
   const [sortBy, setSortBy] = useState('distance');
   const [favorites, setFavorites] = useState(new Set());
   const [workers, setWorkers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const db = getFirestore(app);
 
   React.useEffect(() => {
@@ -89,6 +90,15 @@ export default function ServiceListing() {
     return Array.from(skillsSet).sort();
   }, [workers]);
 
+  // Extract all unique areas from available workers dynamically
+  const DYNAMIC_AREAS = useMemo(() => {
+    const areasSet = new Set(['All Areas']);
+    workers.forEach(w => {
+      if (w.area) areasSet.add(w.area);
+    });
+    return Array.from(areasSet).sort();
+  }, [workers]);
+
   const toggleSkill = (skill) => {
     setSelectedSkills(prev => 
       prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
@@ -110,6 +120,15 @@ export default function ServiceListing() {
     if (selectedArea !== 'All Areas') filtered = filtered.filter(w => w.area === selectedArea);
     filtered = filtered.filter(w => w.hourlyRate >= priceRange.min && w.hourlyRate <= priceRange.max);
     
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(w => 
+        (w.name && w.name.toLowerCase().includes(q)) ||
+        (w.service && w.service.toLowerCase().includes(q)) ||
+        (w.specialty && w.specialty.toLowerCase().includes(q))
+      );
+    }
+    
     // Filter by selected skills (OR logic: worker must have at least one selected skill)
     if (selectedSkills.length > 0) {
       filtered = filtered.filter(w => {
@@ -124,7 +143,7 @@ export default function ServiceListing() {
     else if (sortBy === 'price') filtered.sort((a, b) => a.hourlyRate - b.hourlyRate);
 
     return filtered;
-  }, [selectedService, selectedArea, priceRange, selectedSkills, sortBy, userLocation, workers]);
+  }, [selectedService, selectedArea, priceRange, selectedSkills, sortBy, userLocation, workers, searchQuery]);
 
   const toggleFavorite = (workerId) => {
     const newFavorites = new Set(favorites);
@@ -161,6 +180,8 @@ export default function ServiceListing() {
               <input
                 type="text"
                 placeholder={t('search_placeholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-11 pr-4 py-3 bg-white dark:bg-[#0A132D] text-gray-900 dark:text-white rounded-xl border border-gray-200 dark:border-white/10 focus:outline-none focus:border-[#3B82F6]/50 focus:ring-4 focus:ring-[#3B82F6]/10 transition-all text-sm placeholder-gray-400 dark:placeholder-gray-500 glass-card"
               />
             </div>
@@ -216,7 +237,7 @@ export default function ServiceListing() {
                   onChange={(e) => setSelectedArea(e.target.value)}
                   className="w-full px-4 py-3 glass-card text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-[#3B82F6]/50 focus:ring-4 focus:ring-[#3B82F6]/10 transition-all text-sm appearance-none cursor-pointer"
                 >
-                  {AREAS.map(area => (
+                  {DYNAMIC_AREAS.map(area => (
                     <option key={area} value={area} className="bg-white dark:bg-[#060D1F]">{area}</option>
                   ))}
                 </select>

@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import EditProfileModal from '../components/profile/EditProfileModal';
 import IDCardModal from '../components/profile/IDCardModal';
-import { getFirestore, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import app from '../firebase';
 
 // ============================================================================
@@ -66,6 +66,19 @@ export default function UserDashboard() {
       return () => unsubscribe();
     }
   }, [currentUser, db]);
+
+  const handleCancelBooking = async (bookingId) => {
+    if (window.confirm("Are you sure you want to cancel this booking?")) {
+      try {
+        const bookingRef = doc(db, 'bookings', bookingId);
+        await updateDoc(bookingRef, { status: 'cancelled' });
+        alert("Booking cancelled successfully.");
+      } catch (error) {
+        console.error("Error cancelling booking:", error);
+        alert("Failed to cancel booking.");
+      }
+    }
+  };
 
   // Fallback profile if userData is still loading or incomplete
   const profile = {
@@ -370,7 +383,10 @@ export default function UserDashboard() {
               <div className="flex flex-wrap gap-3 pt-6 border-t border-gray-100 dark:border-white/5">
                 {(booking.status === 'pending' || booking.status === 'accepted') && (
                   <>
-                    <button className="flex-1 px-4 py-3 glass-card border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-500/10 transition-colors text-sm font-medium min-w-[140px]">
+                    <button 
+                      onClick={() => handleCancelBooking(booking.id)}
+                      className="flex-1 px-4 py-3 glass-card border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-500/10 transition-colors text-sm font-medium min-w-[140px]"
+                    >
                       Cancel Booking
                     </button>
                     <button className="flex-1 px-4 py-3 glass-card text-gray-900 dark:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-sm font-medium min-w-[140px]">
@@ -379,7 +395,10 @@ export default function UserDashboard() {
                   </>
                 )}
                 {booking.status === 'completed' && !booking.reviewed && (
-                  <button className="flex-1 px-4 py-3 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white rounded-xl hover:scale-[1.02] transition-transform shadow-lg shadow-[#3B82F6]/25 text-sm font-medium min-w-[140px]">
+                  <button 
+                    onClick={() => navigate(`/review?bookingId=${booking.id}&workerId=${booking.workerId}`)}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white rounded-xl hover:scale-[1.02] transition-transform shadow-lg shadow-[#3B82F6]/25 text-sm font-medium min-w-[140px]"
+                  >
                     Rate & Review
                   </button>
                 )}
