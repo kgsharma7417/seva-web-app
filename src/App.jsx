@@ -16,15 +16,15 @@ const FloatingNav = () => {
   const currentPath = location.pathname;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[999] flex flex-wrap gap-2 glass-card p-2 rounded-2xl shadow-xl border-[#3B82F6]/30 bg-[#060D1F]/90 backdrop-blur-xl max-w-[90vw]">
-      <Link to="/" className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${currentPath === '/' ? 'bg-[#3B82F6] text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>Home</Link>
-      <Link to="/listing" className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${currentPath === '/listing' ? 'bg-[#3B82F6] text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>Listing</Link>
-      <Link to="/worker" className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${currentPath === '/worker' ? 'bg-[#3B82F6] text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>Worker Profile</Link>
-      <Link to="/dashboard" className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${currentPath === '/dashboard' ? 'bg-[#3B82F6] text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>User Dash</Link>
-      <Link to="/worker-dashboard" className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${currentPath === '/worker-dashboard' ? 'bg-[#10B981] text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>Worker Dash</Link>
-      <Link to="/admin" className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${currentPath === '/admin' ? 'bg-[#8B5CF6] text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>Admin Panel</Link>
-      <Link to="/review" className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${currentPath === '/review' ? 'bg-yellow-500 text-black' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>Rate Service</Link>
-      <Link to="/booking" className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${currentPath === '/booking' ? 'bg-[#3B82F6] text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>Booking Flow</Link>
+    <div className="fixed bottom-4 right-4 z-[999] flex flex-wrap gap-2 bg-white p-2 rounded-sm shadow-md border border-gray-200 max-w-[90vw]">
+      <Link to="/" className={`px-3 py-1.5 rounded-sm text-xs font-bold transition ${currentPath === '/' ? 'bg-[#2874f0] text-white' : 'text-gray-600 hover:text-white hover:bg-[#2874f0]'}`}>Home</Link>
+      <Link to="/listing" className={`px-3 py-1.5 rounded-sm text-xs font-bold transition ${currentPath === '/listing' ? 'bg-[#2874f0] text-white' : 'text-gray-600 hover:text-white hover:bg-[#2874f0]'}`}>Listing</Link>
+      <Link to="/worker" className={`px-3 py-1.5 rounded-sm text-xs font-bold transition ${currentPath === '/worker' ? 'bg-[#2874f0] text-white' : 'text-gray-600 hover:text-white hover:bg-[#2874f0]'}`}>Worker Profile</Link>
+      <Link to="/dashboard" className={`px-3 py-1.5 rounded-sm text-xs font-bold transition ${currentPath === '/dashboard' ? 'bg-[#2874f0] text-white' : 'text-gray-600 hover:text-white hover:bg-[#2874f0]'}`}>User Dash</Link>
+      <Link to="/worker-dashboard" className={`px-3 py-1.5 rounded-sm text-xs font-bold transition ${currentPath === '/worker-dashboard' ? 'bg-[#10B981] text-white' : 'text-gray-600 hover:text-white hover:bg-[#2874f0]'}`}>Worker Dash</Link>
+      <Link to="/admin" className={`px-3 py-1.5 rounded-sm text-xs font-bold transition ${currentPath === '/admin' ? 'bg-[#8B5CF6] text-white' : 'text-gray-600 hover:text-white hover:bg-[#2874f0]'}`}>Admin Panel</Link>
+      <Link to="/review" className={`px-3 py-1.5 rounded-sm text-xs font-bold transition ${currentPath === '/review' ? 'bg-yellow-500 text-black' : 'text-gray-600 hover:text-white hover:bg-[#2874f0]'}`}>Rate Service</Link>
+      <Link to="/booking" className={`px-3 py-1.5 rounded-sm text-xs font-bold transition ${currentPath === '/booking' ? 'bg-[#2874f0] text-white' : 'text-gray-600 hover:text-white hover:bg-[#2874f0]'}`}>Booking Flow</Link>
     </div>
   );
 };

@@ -11,7 +11,7 @@
 body {
   margin: 0;
   font-family: var(--font-inter);
-  @apply bg-gray-50 text-gray-900 dark:bg-[#060D1F] dark:text-white transition-colors duration-300;
+  @apply bg-[#F1F3F6] text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300;
   min-height: 100vh;
 }
 
@@ -120,11 +120,7 @@ body {
    ======================================== */
 
 .orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  animation: drift 8s infinite alternate ease-in-out;
-  z-index: 0;
+  display: none;
 }
 
 /* ========================================
@@ -132,15 +128,15 @@ body {
    ======================================== */
 
 .glass-card {
-  @apply bg-white dark:bg-white/5 border border-gray-200/80 dark:border-white/10 shadow-sm dark:shadow-none transition-all duration-300 rounded-2xl;
+  @apply bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-[0_2px_10px_rgb(0,0,0,0.04)] transition-all duration-300 rounded-xl;
 }
 
 .glass-card:hover {
-  @apply -translate-y-[3px] border-gray-300 dark:border-white/20 shadow-md dark:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)];
+  @apply shadow-[0_8px_30px_rgb(0,0,0,0.08)] -translate-y-1 border-gray-200 dark:border-gray-600;
 }
 
 .glass-card-static {
-  @apply bg-white dark:bg-white/5 border border-gray-200/80 dark:border-white/10 shadow-sm dark:shadow-none transition-colors duration-300 rounded-2xl;
+  @apply bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-[0_2px_10px_rgb(0,0,0,0.04)] transition-colors duration-300 rounded-xl;
 }
 
 /* ========================================
@@ -148,8 +144,7 @@ body {
    ======================================== */
 
 .category-card:hover {
-  --hover-glow: #3B82F6;
-  box-shadow: 0 0 20px -5px var(--hover-glow);
+  @apply shadow-md;
 }
 
 /* ========================================
@@ -157,14 +152,11 @@ body {
    ======================================== */
 
 .bg-grid {
-  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
+  display: none;
 }
 
 :is(.dark) .bg-grid {
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  display: none;
 }
 
 /* ========================================

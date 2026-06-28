@@ -79,14 +79,14 @@ const Hero = () => {
 
   return (
     <section className="pt-24 pb-16 px-4 flex flex-col items-center justify-center text-center max-w-4xl mx-auto">
-      <div className="animate-fade-up animate-delay-100 inline-flex items-center space-x-2 bg-gray-100 border-gray-200 dark:bg-white/5 dark:border-white/10 rounded-full px-4 py-1.5 mb-8">
-        <span className="w-2 h-2 rounded-full bg-[#06B6D4] animate-pulse"></span>
-        <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Available in your city</span>
+      <div className="animate-fade-up animate-delay-100 inline-flex items-center space-x-2 bg-white border border-gray-200 rounded-full px-4 py-1.5 mb-8 shadow-sm">
+        <span className="w-2 h-2 rounded-full bg-[#2a55e5] animate-pulse"></span>
+        <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Available in your city</span>
       </div>
       
-      <h1 className="animate-fade-up animate-delay-200 font-syne text-5xl md:text-7xl font-bold leading-tight mb-8 text-gray-900 dark:text-white">
+      <h1 className="animate-fade-up animate-delay-200 font-inter text-4xl md:text-6xl font-bold leading-tight mb-8 text-gray-900 dark:text-white">
         {title1}<br />
-        {title2} <span className="text-gradient">{title3}</span>
+        {title2} <span className="text-[#2a55e5]">{title3}</span>
       </h1>
       
       <p className="animate-fade-up animate-delay-300 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-10 text-lg">
@@ -101,16 +101,16 @@ const Hero = () => {
         <input 
           type="text" 
           placeholder={t('search_placeholder')} 
-          className="w-full bg-white dark:bg-[#0A132D] border border-gray-200 dark:border-white/10 rounded-2xl py-4 md:py-5 pl-12 pr-28 md:pr-40 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#3B82F6]/50 focus:ring-4 focus:ring-[#3B82F6]/10 transition-all shadow-lg dark:shadow-none"
+          className="w-full bg-white border border-gray-200 rounded-full py-4 md:py-4 pl-12 pr-28 md:pr-40 text-gray-900 placeholder-gray-500 focus:outline-none focus:border-[#2a55e5] transition-colors shadow-sm"
         />
         <div className="absolute inset-y-0 right-2 flex items-center space-x-2">
           
           <div className="relative">
             <button 
               onClick={() => setIsLocationDropdownOpen(!isLocationDropdownOpen)}
-              className="hidden sm:flex items-center px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-lg border border-gray-200 dark:border-white/5 text-xs text-gray-700 dark:text-gray-300 mr-2 transition-colors"
+              className="hidden sm:flex items-center px-3 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-full border border-gray-200 text-xs text-gray-700 mr-2 transition-colors"
             >
-              <MapPin className="w-3 h-3 mr-1 text-[#06B6D4]" />
+              <MapPin className="w-3 h-3 mr-1 text-[#2a55e5]" />
               <span className="max-w-[100px] truncate">{userLocation.name}</span>
               <ChevronDown className="w-3 h-3 ml-1" />
             </button>
@@ -147,7 +147,7 @@ const Hero = () => {
             )}
           </div>
 
-          <button onClick={() => navigate('/listing')} className="bg-gradient-to-r from-[#3B82F6] to-[#06B6D4] text-white px-4 py-2 md:px-6 md:py-3 text-sm md:text-base rounded-xl hover:scale-105 transition-transform shadow-lg shadow-[#3B82F6]/25 flex items-center font-bold">
+          <button onClick={() => navigate('/listing')} className="bg-[#2a55e5] hover:bg-[#1f42b3] text-white px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base rounded-full transition-colors shadow-sm flex items-center font-bold">
             {t('search_btn')}
           </button>
         </div>
@@ -155,9 +155,9 @@ const Hero = () => {
       
       {/* Quick Select Chips */}
       <div className="animate-fade-up animate-delay-400 flex flex-wrap items-center justify-center gap-3 text-sm">
-        <span className="text-gray-500 dark:text-gray-400 font-medium mr-2">Quick links:</span>
+        <span className="text-gray-600 font-bold mr-2">Quick links:</span>
         {['AC Repair', 'Plumbing', 'Electrician', 'Cleaning'].map((chip) => (
-          <button key={chip} onClick={() => navigate('/listing')} className="px-4 py-2 rounded-full bg-white border border-gray-200 dark:bg-white/5 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 dark:hover:text-white transition-colors shadow-sm dark:shadow-none">
+          <button key={chip} onClick={() => navigate('/listing')} className="px-4 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors shadow-sm font-medium">
             {chip}
           </button>
         ))}
